@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useNow } from "@/lib/use-now";
 import { Button } from "@/components/ui";
-import { logEvent } from "@/lib/data/log";
+import type { LogInput } from "@/lib/data/log";
 import type { EventType } from "@/types/db";
 
 /**
@@ -16,7 +16,14 @@ import type { EventType } from "@/types/db";
 
 interface FormProps {
   babyId: string;
+  /**
+   * שולח את הרישום. לא מחזיר Promise בכוונה: המסך נסגר והרישום מופיע
+   * מיד, והשמירה בפועל ממשיכה ברקע. אם היא תיכשל, הרישום יוסר והודעה
+   * תוסבר — אבל במקרה הרגיל המשתמש לא מחכה לרשת אפילו שנייה.
+   */
+  submit: (input: LogInput) => void;
   onDone: () => void;
+  /** שגיאת קלט מקומית (לא שגיאת רשת — זו מטופלת ברקע) */
   onError: (message: string) => void;
 }
 
@@ -134,43 +141,22 @@ function ChoiceRow<T extends string>({
   );
 }
 
-function SaveButton({ busy, label = "שמירה" }: { busy: boolean; label?: string }) {
+function SaveButton({ label = "שמירה" }: { label?: string }) {
   return (
-    <Button type="submit" fullWidth loading={busy} className="mt-1">
-      {busy ? "שומר…" : label}
+    <Button type="submit" fullWidth className="mt-1">
+      {label}
     </Button>
   );
 }
 
-/** עוטף שליחה: מונע לחיצה כפולה ומעביר שגיאה למי שמציג אותה. */
-function useSubmit(onDone: () => void, onError: (m: string) => void) {
-  const [busy, setBusy] = useState(false);
-
-  return {
-    busy,
-    submit: async (fn: () => Promise<unknown>) => {
-      if (busy) return;
-      setBusy(true);
-      try {
-        await fn();
-        onDone();
-      } catch (e) {
-        onError(e instanceof Error ? e.message : "השמירה נכשלה");
-        setBusy(false);
-      }
-    },
-  };
-}
-
 /* ------------------------------------------------------------------ חיתול */
 
-export function DiaperForm({ babyId, onDone, onError }: FormProps) {
+export function DiaperForm({ babyId, submit, onDone }: FormProps) {
   const [kind, setKind] = useState<"pee" | "poo" | "both" | "dry">("pee");
   const [color, setColor] = useState<string | null>(null);
   const [rash, setRash] = useState(false);
   const [at, setAt] = useState(new Date());
   const [note, setNote] = useState("");
-  const { busy, submit } = useSubmit(onDone, onError);
 
   const hasPoo = kind === "poo" || kind === "both";
 
@@ -179,20 +165,19 @@ export function DiaperForm({ babyId, onDone, onError }: FormProps) {
       className="flex flex-col gap-4"
       onSubmit={(e) => {
         e.preventDefault();
-        submit(() =>
-          logEvent({
-            babyId,
-            type: "diaper",
-            startedAt: at,
-            note,
-            data: {
-              pee: kind === "pee" || kind === "both",
-              poo: hasPoo,
-              color: hasPoo ? color : null,
-              rash,
-            },
-          }),
-        );
+        submit({
+          babyId,
+          type: "diaper",
+          startedAt: at,
+          note,
+          data: {
+            pee: kind === "pee" || kind === "both",
+            poo: hasPoo,
+            color: hasPoo ? color : null,
+            rash,
+          },
+        });
+        onDone();
       }}
     >
       <ChoiceRow
@@ -233,7 +218,7 @@ export function DiaperForm({ babyId, onDone, onError }: FormProps) {
 
       <TimePicker value={at} onChange={setAt} />
       <NoteField value={note} onChange={setNote} />
-      <SaveButton busy={busy} />
+      <SaveButton />
     </form>
   );
 }
@@ -242,30 +227,28 @@ export function DiaperForm({ babyId, onDone, onError }: FormProps) {
 
 export function BottleForm({
   babyId,
+  submit,
   onDone,
-  onError,
   lastAmountMl,
 }: FormProps & { lastAmountMl?: number | null }) {
   const [amount, setAmount] = useState<number>(lastAmountMl ?? 80);
   const [kind, setKind] = useState<"formula" | "breast_milk" | "expressed">("formula");
   const [at, setAt] = useState(new Date());
   const [note, setNote] = useState("");
-  const { busy, submit } = useSubmit(onDone, onError);
 
   return (
     <form
       className="flex flex-col gap-4"
       onSubmit={(e) => {
         e.preventDefault();
-        submit(() =>
-          logEvent({
-            babyId,
-            type: "feed_bottle",
-            startedAt: at,
-            note,
-            data: { amount_ml: amount, kind },
-          }),
-        );
+        submit({
+          babyId,
+          type: "feed_bottle",
+          startedAt: at,
+          note,
+          data: { amount_ml: amount, kind },
+        });
+        onDone();
       }}
     >
       <div className="flex flex-col gap-2">
@@ -317,18 +300,17 @@ export function BottleForm({
 
       <TimePicker value={at} onChange={setAt} />
       <NoteField value={note} onChange={setNote} />
-      <SaveButton busy={busy} />
+      <SaveButton />
     </form>
   );
 }
 
 /* -------------------------------------------------------------- חום ומשקל */
 
-export function TemperatureForm({ babyId, onDone, onError }: FormProps) {
+export function TemperatureForm({ babyId, submit, onDone }: FormProps) {
   const [celsius, setCelsius] = useState(36.8);
   const [at, setAt] = useState(new Date());
   const [note, setNote] = useState("");
-  const { busy, submit } = useSubmit(onDone, onError);
 
   // ספי ההתייחסות המקובלים לתינוקות
   const status =
@@ -341,15 +323,14 @@ export function TemperatureForm({ babyId, onDone, onError }: FormProps) {
       className="flex flex-col gap-4"
       onSubmit={(e) => {
         e.preventDefault();
-        submit(() =>
-          logEvent({
-            babyId,
-            type: "temperature",
-            startedAt: at,
-            note,
-            data: { celsius },
-          }),
-        );
+        submit({
+          babyId,
+          type: "temperature",
+          startedAt: at,
+          note,
+          data: { celsius },
+        });
+        onDone();
       }}
     >
       <div className="flex flex-col items-center gap-1">
@@ -381,17 +362,16 @@ export function TemperatureForm({ babyId, onDone, onError }: FormProps) {
 
       <TimePicker value={at} onChange={setAt} />
       <NoteField value={note} onChange={setNote} />
-      <SaveButton busy={busy} />
+      <SaveButton />
     </form>
   );
 }
 
-export function GrowthForm({ babyId, onDone, onError }: FormProps) {
+export function GrowthForm({ babyId, submit, onDone, onError }: FormProps) {
   const [weightKg, setWeightKg] = useState("");
   const [heightCm, setHeightCm] = useState("");
   const [headCm, setHeadCm] = useState("");
   const [at, setAt] = useState(new Date());
-  const { busy, submit } = useSubmit(onDone, onError);
 
   const nothing = !weightKg && !heightCm && !headCm;
 
@@ -404,18 +384,17 @@ export function GrowthForm({ babyId, onDone, onError }: FormProps) {
           onError("צריך למלא לפחות מדידה אחת");
           return;
         }
-        submit(() =>
-          logEvent({
-            babyId,
-            type: "growth",
-            startedAt: at,
-            data: {
-              weight_g: weightKg ? Math.round(parseFloat(weightKg) * 1000) : null,
-              height_cm: heightCm ? parseFloat(heightCm) : null,
-              head_cm: headCm ? parseFloat(headCm) : null,
-            },
-          }),
-        );
+        submit({
+          babyId,
+          type: "growth",
+          startedAt: at,
+          data: {
+            weight_g: weightKg ? Math.round(parseFloat(weightKg) * 1000) : null,
+            height_cm: heightCm ? parseFloat(heightCm) : null,
+            head_cm: headCm ? parseFloat(headCm) : null,
+          },
+        });
+        onDone();
       }}
     >
       {[
@@ -438,7 +417,7 @@ export function GrowthForm({ babyId, onDone, onError }: FormProps) {
       ))}
 
       <TimePicker value={at} onChange={setAt} />
-      <SaveButton busy={busy} />
+      <SaveButton />
     </form>
   );
 }
@@ -447,25 +426,25 @@ export function GrowthForm({ babyId, onDone, onError }: FormProps) {
 
 export function SimpleForm({
   babyId,
+  submit,
   type,
   onDone,
-  onError,
 }: FormProps & { type: EventType }) {
   const [note, setNote] = useState("");
   const [at, setAt] = useState(new Date());
-  const { busy, submit } = useSubmit(onDone, onError);
 
   return (
     <form
       className="flex flex-col gap-4"
       onSubmit={(e) => {
         e.preventDefault();
-        submit(() => logEvent({ babyId, type, startedAt: at, note }));
+        submit({ babyId, type, startedAt: at, note });
+        onDone();
       }}
     >
       <NoteField value={note} onChange={setNote} />
       <TimePicker value={at} onChange={setAt} />
-      <SaveButton busy={busy} />
+      <SaveButton />
     </form>
   );
 }

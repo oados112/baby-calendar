@@ -1,7 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SinceCard } from "@/components/since-card";
 import { Sheet } from "@/components/sheet";
 import { TimerPanel } from "@/components/timer-panel";
@@ -29,9 +28,10 @@ import {
 } from "@/components/icons";
 import { babyDisplayName, babyInitial, newbornAge } from "@/lib/baby";
 import { EVENT_META, FAMILY_CLASSES, summarizeEvent } from "@/lib/event-meta";
-import { babyAgeHebrew, durationHebrew, formatClock } from "@/lib/time";
-import { startTimer } from "@/lib/data/log";
-import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { babyAgeHebrew, durationHebrew } from "@/lib/time";
+import { deleteEvent, logEvent, startTimer, type LogInput } from "@/lib/data/log";
+import { EventList } from "@/components/event-list";
+import { makeTempId, useLiveData } from "@/lib/use-live-data";
 import type { ActiveTimerRow, EventRow, EventType } from "@/types/db";
 
 export interface DashboardBaby {
@@ -44,8 +44,10 @@ export interface DashboardBaby {
 
 export interface DashboardProps {
   baby: DashboardBaby;
+  /** מצב הפתיחה מהשרת; מכאן והלאה הרשימה חיה בצד הלקוח */
   events: EventRow[];
   timers: ActiveTimerRow[];
+  currentUserId?: string;
   /** שם להצגה לכל user_id, כדי לתייג "מי רשם" */
   memberNames: Record<string, string>;
   /** מצב תצוגה עם נתוני דוגמה — הכתיבה מושבתת */
@@ -98,15 +100,23 @@ const MORE_ACTIONS: EventType[] = [
 
 export function Dashboard({
   baby,
-  events,
-  timers,
+  events: initialEvents,
+  timers: initialTimers,
   memberNames,
+  currentUserId,
   demo = false,
 }: DashboardProps) {
-  const router = useRouter();
+  const { events, timers, addOptimistic, removeOptimistic } = useLiveData({
+    babyId: baby.id,
+    initialEvents,
+    initialTimers,
+    enabled: !demo,
+  });
   const [sheet, setSheet] = useState<EventType | "more" | "breast_start" | null>(null);
   const [toast, setToast] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [undo, setUndo] = useState<{ message: string; action: () => void } | null>(
+    null,
+  );
 
   const initial = babyInitial(baby.name);
   const lastFeed = useMemo(
@@ -120,49 +130,91 @@ export function Dashboard({
   const sleepRunning = timers.some((t) => t.type === "sleep");
   const breastRunning = timers.some((t) => t.type === "feed_breast");
 
-  // סנכרון חי: מה שההורה השני רושם מופיע כאן תוך שנייה, בלי רענון
-  useEffect(() => {
-    if (demo) return;
-    const supabase = getSupabaseBrowserClient();
-    const channel = supabase
-      .channel(`baby-${baby.id}`)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "events", filter: `baby_id=eq.${baby.id}` },
-        () => router.refresh(),
-      )
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "active_timers", filter: `baby_id=eq.${baby.id}` },
-        () => router.refresh(),
-      )
-      .subscribe();
+  /**
+   * רישום.
+   *
+   * מופיע על המסך מיד ונשמר ברקע. אם השמירה נכשלה הוא מוסר והודעה
+   * מסבירה — אבל במקרה הרגיל אין שום המתנה לרשת.
+   */
+  const submit = useCallback(
+    (input: LogInput) => {
+      if (demo) {
+        setToast("זו תצוגה לדוגמה — הרישום יעבוד אחרי ההתחברות");
+        return;
+      }
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [baby.id, demo, router]);
+      const optimistic: EventRow = {
+        id: makeTempId(),
+        baby_id: input.babyId,
+        family_id: "",
+        type: input.type,
+        started_at: input.startedAt.toISOString(),
+        ended_at: input.endedAt ? input.endedAt.toISOString() : null,
+        data: (input.data ?? {}) as EventRow["data"],
+        note: input.note?.trim() || null,
+        photo_path: null,
+        created_by: currentUserId ?? "",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        updated_by: null,
+        deleted_at: null,
+      };
 
-  function refresh() {
+      const { confirm, rollback } = addOptimistic(optimistic);
+
+      logEvent(input)
+        .then(({ id }) => confirm({ ...optimistic, id }))
+        .catch((e: unknown) => {
+          rollback();
+          setToast(e instanceof Error ? e.message : "השמירה נכשלה");
+        });
+    },
+    [addOptimistic, currentUserId, demo],
+  );
+
+  /** מחיקה רכה, עם אפשרות להחזיר. */
+  const handleDelete = useCallback(
+    (event: EventRow) => {
+      if (demo) {
+        setToast("זו תצוגה לדוגמה — המחיקה תעבוד אחרי ההתחברות");
+        return;
+      }
+
+      const { restore } = removeOptimistic(event.id);
+
+      deleteEvent(event.id)
+        .then(() => {
+          setUndo({
+            message: `${EVENT_META[event.type].label} נמחק`,
+            // "ביטול" רושם מחדש את אותם נתונים — הרישום המקורי נשאר מחוק
+            action: () =>
+              submit({
+                babyId: event.baby_id,
+                type: event.type,
+                startedAt: new Date(event.started_at),
+                endedAt: event.ended_at ? new Date(event.ended_at) : null,
+                data: (event.data ?? {}) as Record<string, unknown>,
+                note: event.note,
+              }),
+          });
+        })
+        .catch((e: unknown) => {
+          restore();
+          setToast(e instanceof Error ? e.message : "המחיקה נכשלה");
+        });
+    },
+    [demo, removeOptimistic, submit],
+  );
+
+  function startTimerNow(type: "feed_breast" | "sleep", side?: "left" | "right") {
     setSheet(null);
-    router.refresh();
-  }
-
-  async function guard(fn: () => Promise<unknown>) {
-    if (busy) return;
     if (demo) {
-      setToast("זו תצוגה לדוגמה — הרישום יעבוד אחרי ההתחברות");
+      setToast("זו תצוגה לדוגמה — הטיימר יעבוד אחרי ההתחברות");
       return;
     }
-    setBusy(true);
-    try {
-      await fn();
-      router.refresh();
-    } catch (e) {
-      setToast(e instanceof Error ? e.message : "הפעולה נכשלה");
-    } finally {
-      setBusy(false);
-    }
+    startTimer(baby.id, type, side).catch((e: unknown) =>
+      setToast(e instanceof Error ? e.message : "לא הצלחנו להתחיל את הטיימר"),
+    );
   }
 
   return (
@@ -190,7 +242,7 @@ export function Dashboard({
         <TimerPanel
           babyId={baby.id}
           timers={timers}
-          onChange={refresh}
+          submit={submit}
           onError={setToast}
         />
 
@@ -247,15 +299,11 @@ export function Dashboard({
               הכפתורים למטה מתחילים.
             </p>
           ) : (
-            <ol className="relative space-y-1">
-              <span
-                aria-hidden
-                className="absolute top-2 bottom-2 end-[1.375rem] w-px bg-subtle"
-              />
-              {events.map((e) => (
-                <TimelineRow key={e.id} event={e} memberNames={memberNames} />
-              ))}
-            </ol>
+            <EventList
+              events={events}
+              memberNames={memberNames}
+              onDelete={handleDelete}
+            />
           )}
         </section>
       </main>
@@ -290,9 +338,7 @@ export function Dashboard({
             type="sleep"
             icon={IconSleep}
             active={sleepRunning}
-            onClick={() =>
-              sleepRunning ? undefined : guard(() => startTimer(baby.id, "sleep"))
-            }
+            onClick={() => (sleepRunning ? undefined : startTimerNow("sleep"))}
           />
           <QuickButton
             label="עוד"
@@ -311,20 +357,27 @@ export function Dashboard({
             (lastBottle?.data as { amount_ml?: number } | null)?.amount_ml ?? null
           }
           demo={demo}
+          submit={submit}
           onPick={(type) => setSheet(type)}
-          onStartBreast={(side) =>
-            guard(async () => {
-              await startTimer(baby.id, "feed_breast", side);
-              setSheet(null);
-            })
-          }
+          onStartBreast={(side) => startTimerNow("feed_breast", side)}
           onClose={() => setSheet(null)}
-          onDone={refresh}
+          onDone={() => setSheet(null)}
           onError={setToast}
         />
       ) : null}
 
       {toast ? <Toast message={toast} onDismiss={() => setToast(null)} /> : null}
+      {undo ? (
+        <Toast
+          message={undo.message}
+          actionLabel="ביטול"
+          onAction={() => {
+            undo.action();
+            setUndo(null);
+          }}
+          onDismiss={() => setUndo(null)}
+        />
+      ) : null}
     </div>
   );
 }
@@ -334,6 +387,7 @@ function LogSheet({
   babyId,
   lastAmountMl,
   demo,
+  submit,
   onPick,
   onStartBreast,
   onClose,
@@ -344,6 +398,7 @@ function LogSheet({
   babyId: string;
   lastAmountMl: number | null;
   demo: boolean;
+  submit: (input: LogInput) => void;
   onPick: (type: EventType) => void;
   onStartBreast: (side: "left" | "right") => void;
   onClose: () => void;
@@ -400,7 +455,7 @@ function LogSheet({
   }
 
   const meta = EVENT_META[kind];
-  const props = { babyId, onDone, onError };
+  const props = { babyId, submit, onDone, onError };
 
   return (
     <Sheet title={`רישום ${meta.label}`} onClose={onClose}>
@@ -456,74 +511,44 @@ function QuickButton({
   );
 }
 
-function TimelineRow({
-  event,
-  memberNames,
+/** הודעה קצרה בתחתית המסך. נעלמת לבד, ואפשר לסגור או לפעול ממנה. */
+function Toast({
+  message,
+  actionLabel,
+  onAction,
+  onDismiss,
 }: {
-  event: EventRow;
-  memberNames: Record<string, string>;
+  message: string;
+  actionLabel?: string;
+  onAction?: () => void;
+  onDismiss: () => void;
 }) {
-  const meta = EVENT_META[event.type];
-  const colors = FAMILY_CLASSES[meta.family];
-  const summary = summarizeEvent(event.type, event.data);
-  const duration =
-    event.ended_at &&
-    durationHebrew(
-      (new Date(event.ended_at).getTime() - new Date(event.started_at).getTime()) / 1000,
-    );
-
-  return (
-    <li className="relative flex items-start gap-3 rounded-md px-1 py-2">
-      <div className="order-2 min-w-0 flex-1">
-        <div className="flex items-baseline gap-2">
-          <span className="text-[0.9375rem] font-medium text-strong">{meta.label}</span>
-          {duration ? (
-            <span className="tnum text-[0.8125rem] text-muted">{duration}</span>
-          ) : null}
-        </div>
-        <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[0.8125rem] text-muted">
-          <span className="tnum">{formatClock(new Date(event.started_at))}</span>
-          {summary ? (
-            <>
-              <span className="text-faint">·</span>
-              <span>{summary}</span>
-            </>
-          ) : null}
-          {memberNames[event.created_by] ? (
-            <>
-              <span className="text-faint">·</span>
-              <span className="text-faint">{memberNames[event.created_by]}</span>
-            </>
-          ) : null}
-        </div>
-        {event.note ? (
-          <p className="mt-1 text-[0.8125rem] text-default">{event.note}</p>
-        ) : null}
-      </div>
-
-      <span
-        className={`order-3 grid size-9 shrink-0 place-items-center rounded-full ${colors.soft} ${colors.text} ring-4 ring-[var(--surface-base)]`}
-      >
-        <IconFor type={event.type} />
-      </span>
-    </li>
-  );
-}
-
-/** הודעה קצרה בתחתית המסך. נעלמת לבד, ואפשר לסגור אותה. */
-function Toast({ message, onDismiss }: { message: string; onDismiss: () => void }) {
+  // ref ולא תלות ישירה: כך שינוי ב-onDismiss לא מאפס את הטיימר בכל רינדור
+  const dismiss = useRef(onDismiss);
   useEffect(() => {
-    const id = setTimeout(onDismiss, 4000);
-    return () => clearTimeout(id);
+    dismiss.current = onDismiss;
   }, [onDismiss]);
+
+  useEffect(() => {
+    const id = setTimeout(() => dismiss.current(), actionLabel ? 6000 : 4000);
+    return () => clearTimeout(id);
+  }, [actionLabel]);
 
   return (
     <div
       role="status"
-      className="fixed inset-x-4 bottom-28 z-50 mx-auto max-w-sm rounded-lg bg-surface-raised px-4 py-3 text-center text-[0.875rem] text-strong"
+      className="fixed inset-x-4 bottom-28 z-50 mx-auto flex max-w-sm items-center justify-between gap-3 rounded-lg bg-surface-raised px-4 py-3 text-[0.875rem] text-strong"
       style={{ boxShadow: "var(--shadow-lg)" }}
     >
-      {message}
+      <span className="flex-1 text-start">{message}</span>
+      {actionLabel ? (
+        <button
+          onClick={onAction}
+          className="shrink-0 font-semibold text-accent-text"
+        >
+          {actionLabel}
+        </button>
+      ) : null}
     </div>
   );
 }

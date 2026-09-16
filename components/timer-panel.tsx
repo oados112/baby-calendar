@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui";
 import { IconBreast, IconSleep, IconStop } from "@/components/icons";
 import { formatDuration } from "@/lib/time";
-import { cancelTimer, logEvent, startTimer, switchSide } from "@/lib/data/log";
+import { cancelTimer, switchSide, type LogInput } from "@/lib/data/log";
 import type { ActiveTimerRow } from "@/types/db";
 
 /**
@@ -33,12 +33,13 @@ function elapsedSeconds(from: string): number {
 export function TimerPanel({
   babyId,
   timers,
-  onChange,
+  submit,
   onError,
 }: {
   babyId: string;
   timers: ActiveTimerRow[];
-  onChange: () => void;
+  /** רושם את הסשן שהסתיים — מופיע ברשימה מיד */
+  submit: (input: LogInput) => void;
   onError: (message: string) => void;
 }) {
   const breast = timers.find((t) => t.type === "feed_breast") ?? null;
@@ -52,12 +53,12 @@ export function TimerPanel({
         <BreastTimer
           babyId={babyId}
           timer={breast}
-          onChange={onChange}
+          submit={submit}
           onError={onError}
         />
       ) : null}
       {sleep ? (
-        <SleepTimer babyId={babyId} timer={sleep} onChange={onChange} onError={onError} />
+        <SleepTimer babyId={babyId} timer={sleep} submit={submit} onError={onError} />
       ) : null}
     </section>
   );
@@ -66,12 +67,12 @@ export function TimerPanel({
 function BreastTimer({
   babyId,
   timer,
-  onChange,
+  submit,
   onError,
 }: {
   babyId: string;
   timer: ActiveTimerRow;
-  onChange: () => void;
+  submit: (input: LogInput) => void;
   onError: (m: string) => void;
 }) {
   useSeconds(true);
@@ -87,7 +88,6 @@ function BreastTimer({
     setBusy(true);
     try {
       await fn();
-      onChange();
     } catch (e) {
       onError(e instanceof Error ? e.message : "הפעולה נכשלה");
     } finally {
@@ -155,18 +155,17 @@ function BreastTimer({
           variant="primary"
           fullWidth
           disabled={busy}
-          onClick={() =>
-            act(async () => {
-              await logEvent({
-                babyId,
-                type: "feed_breast",
-                startedAt: new Date(timer.started_at),
-                endedAt: new Date(),
-                data: { left_sec: left, right_sec: right, last_side: timer.side },
-              });
-              await cancelTimer(babyId, "feed_breast");
-            })
-          }
+          onClick={() => {
+            // הרישום נשלח קודם ומופיע מיד; עצירת הטיימר ממשיכה ברקע
+            submit({
+              babyId,
+              type: "feed_breast",
+              startedAt: new Date(timer.started_at),
+              endedAt: new Date(),
+              data: { left_sec: left, right_sec: right, last_side: timer.side },
+            });
+            act(() => cancelTimer(babyId, "feed_breast"));
+          }}
         >
           <IconStop className="size-4" />
           סיום ושמירה
@@ -186,12 +185,12 @@ function BreastTimer({
 function SleepTimer({
   babyId,
   timer,
-  onChange,
+  submit,
   onError,
 }: {
   babyId: string;
   timer: ActiveTimerRow;
-  onChange: () => void;
+  submit: (input: LogInput) => void;
   onError: (m: string) => void;
 }) {
   useSeconds(true);
@@ -203,7 +202,6 @@ function SleepTimer({
     setBusy(true);
     try {
       await fn();
-      onChange();
     } catch (e) {
       onError(e instanceof Error ? e.message : "הפעולה נכשלה");
     } finally {
@@ -230,17 +228,15 @@ function SleepTimer({
           variant="primary"
           fullWidth
           disabled={busy}
-          onClick={() =>
-            act(async () => {
-              await logEvent({
-                babyId,
-                type: "sleep",
-                startedAt: new Date(timer.started_at),
-                endedAt: new Date(),
-              });
-              await cancelTimer(babyId, "sleep");
-            })
-          }
+          onClick={() => {
+            submit({
+              babyId,
+              type: "sleep",
+              startedAt: new Date(timer.started_at),
+              endedAt: new Date(),
+            });
+            act(() => cancelTimer(babyId, "sleep"));
+          }}
         >
           <IconStop className="size-4" />
           התעורר/ה
@@ -257,11 +253,3 @@ function SleepTimer({
   );
 }
 
-/** כפתורי הפעלה, מוצגים כשאין טיימר פעיל מהסוג המתאים. */
-export async function beginTimer(
-  babyId: string,
-  type: "feed_breast" | "sleep",
-  side?: "left" | "right",
-) {
-  await startTimer(babyId, type, side);
-}

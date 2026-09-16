@@ -41,6 +41,7 @@ export default async function HomePage() {
       events={events}
       timers={timers}
       memberNames={memberNames}
+      currentUserId={context.member.user_id}
     />
   );
 }
