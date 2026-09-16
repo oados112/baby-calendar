@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { isSupabaseConfigured } from "@/lib/config";
 
 /** נתיבים שפתוחים למי שלא מחובר. */
-const PUBLIC_PATHS = ["/login", "/auth/callback", "/invite"];
+const PUBLIC_PATHS = ["/login", "/auth/callback", "/invite", "/offline"];
 
 function isPublic(pathname: string) {
   return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));

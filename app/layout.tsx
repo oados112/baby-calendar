@@ -3,6 +3,7 @@ import Script from "next/script";
 import { Heebo } from "next/font/google";
 import "./globals.css";
 import { THEME_INIT_SCRIPT } from "@/lib/theme";
+import { ServiceWorkerRegistrar } from "@/components/service-worker";
 
 const heebo = Heebo({
   variable: "--font-heebo",
@@ -53,6 +54,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           דילוג לתוכן
         </a>
         {children}
+        <ServiceWorkerRegistrar />
       </body>
     </html>
   );
