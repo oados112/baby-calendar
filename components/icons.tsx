@@ -154,6 +154,16 @@ export const IconSettings = (p: IconProps) => (
   </Icon>
 );
 
+/** תינוק — לאווטאר כשעדיין אין שם ואין תמונה */
+export const IconBaby = (p: IconProps) => (
+  <Icon {...p}>
+    <circle cx="12" cy="9" r="5.5" />
+    <path d="M9.8 8.5h.01M14.2 8.5h.01" strokeWidth="2" />
+    <path d="M10.3 11.3a2.6 2.6 0 0 0 3.4 0" />
+    <path d="M5 21a7 7 0 0 1 14 0" />
+  </Icon>
+);
+
 export const IconHome = (p: IconProps) => (
   <Icon {...p}>
     <path d="M4 10.5 12 4l8 6.5V19a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 19Z" />

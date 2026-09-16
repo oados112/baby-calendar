@@ -112,7 +112,8 @@ create index invites_family_idx on invites (family_id) where accepted_at is null
 create table babies (
   id          uuid primary key default gen_random_uuid(),
   family_id   uuid not null references families (id) on delete cascade,
-  name        text not null check (length(trim(name)) between 1 and 40),
+  -- השם יכול להיות ריק: בימים הראשונים עדיין אין שם, וזה מצב תקין ולא חסר
+  name        text check (name is null or length(trim(name)) between 1 and 40),
   birth_date  date not null,
   -- שעת לידה, אופציונלי — משמשת לחישוב גיל מדויק בימים הראשונים
   birth_time  time,

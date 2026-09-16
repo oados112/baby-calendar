@@ -106,26 +106,27 @@ export function babyAgeHebrew(
 ): string {
   const b = new Date(birthDate);
   const days = Math.floor((now.getTime() - b.getTime()) / (DAY * 1000));
-  const ben = sex === "female" ? "בת" : "בן";
+  // כשהמין לא צוין לא ממציאים אותו — פשוט משמיטים את "בן/בת"
+  const ben = sex === "female" ? "בת " : sex === "male" ? "בן " : "";
 
   if (days < 0) return "טרם נולד";
   if (days === 0) return "נולד היום";
-  if (days === 1) return `${ben} יום`;
-  if (days < 14) return `${ben} ${days} ימים`;
+  if (days === 1) return `${ben}יום`;
+  if (days < 14) return `${ben}${days} ימים`;
   if (days < 60) {
     const weeks = Math.floor(days / 7);
-    return `${ben} ${weeks} שבועות`;
+    return `${ben}${weeks} שבועות`;
   }
 
   let months =
     (now.getFullYear() - b.getFullYear()) * 12 + (now.getMonth() - b.getMonth());
   if (now.getDate() < b.getDate()) months -= 1;
 
-  if (months < 24) return months === 1 ? `${ben} חודש` : `${ben} ${months} חודשים`;
+  if (months < 24) return months === 1 ? `${ben}חודש` : `${ben}${months} חודשים`;
 
   const years = Math.floor(months / 12);
   const rem = months % 12;
   const yearPart = years === 2 ? "שנתיים" : `${years} שנים`;
-  if (rem === 0) return `${ben} ${yearPart}`;
-  return `${ben} ${yearPart} ו-${rem === 1 ? "חודש" : `${rem} חודשים`}`;
+  if (rem === 0) return `${ben}${yearPart}`;
+  return `${ben}${yearPart} ו-${rem === 1 ? "חודש" : `${rem} חודשים`}`;
 }

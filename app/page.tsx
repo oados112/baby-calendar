@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { SinceCard } from "@/components/since-card";
 import {
   IconActivity,
+  IconBaby,
   IconBottle,
   IconBreast,
   IconDiaper,
@@ -16,6 +17,7 @@ import {
   IconTemp,
 } from "@/components/icons";
 import { DEMO_MEMBER_NAMES, getDemoBaby, getDemoEvents } from "@/lib/demo-data";
+import { babyDisplayName, babyInitial, newbornAge } from "@/lib/baby";
 import { EVENT_META, FAMILY_CLASSES, summarizeEvent } from "@/lib/event-meta";
 import { babyAgeHebrew, durationHebrew, formatClock } from "@/lib/time";
 import type { EventRow, EventType } from "@/types/db";
@@ -47,6 +49,7 @@ const QUICK_ACTIONS: {
 export default function HomePage() {
   const events = getDemoEvents();
   const baby = getDemoBaby();
+  const initial = babyInitial(baby.name);
   const [openSheet, setOpenSheet] = useState<EventType | null>(null);
 
   const lastFeed = useMemo(
@@ -62,14 +65,15 @@ export default function HomePage() {
       <header className="flex items-center justify-between gap-3 px-4 pt-[calc(1rem+var(--safe-top))] pb-3">
         <div className="flex items-center gap-3">
           <div className="grid size-11 place-items-center rounded-full bg-accent-soft text-lg font-semibold text-accent-text">
-            {baby.name.charAt(0)}
+            {initial ?? <IconBaby className="size-6" />}
           </div>
           <div>
             <h1 className="text-lg leading-tight font-semibold text-strong">
-              {baby.name}
+              {babyDisplayName(baby.name)}
             </h1>
-            <p className="text-[0.8125rem] text-muted">
-              {babyAgeHebrew(baby.birth_date, baby.sex)}
+            <p className="text-[0.8125rem] text-muted" suppressHydrationWarning>
+              {newbornAge(baby.birth_date, baby.birth_time) ??
+                babyAgeHebrew(baby.birth_date, baby.sex)}
             </p>
           </div>
         </div>

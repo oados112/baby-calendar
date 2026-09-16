@@ -7,18 +7,17 @@
 
 ## 1. GitHub — הבית של הקוד
 
-1. היכנס ל-[github.com](https://github.com) עם החשבון שלך.
-2. צור repository חדש בשם `baby-calendar`, וסמן **Private**.
-   אל תסמן "Add a README" — כבר יש לנו קוד.
-3. חבר את התיקייה המקומית ודחוף (הרץ בתיקיית הפרויקט):
+✅ בוצע: <https://github.com/oados112/baby-calendar> (פרטי), וה-remote כבר מחובר
+מקומית לענף `main`.
+
+נותר:
+1. לדחוף בפעם הראשונה:
 
 ```bash
-git remote add origin https://github.com/<שם-המשתמש-שלך>/baby-calendar.git
-git branch -M main
 git push -u origin main
 ```
 
-4. הוסף את אשתך: `Settings → Collaborators → Add people`.
+2. להוסיף את לילך כ-collaborator: `Settings → Collaborators → Add people`.
 
 ---
 
@@ -38,19 +37,16 @@ git push -u origin main
 
 1. את כל התוכן של `supabase/migrations/0001_init.sql`
 2. את כל התוכן של `supabase/migrations/0002_rpc.sql`
+3. את כל התוכן של `supabase/migrations/0003_seed_whitelist.sql`
 
 ### 2.2 הרשימה הלבנה — מי בכלל יכול להיכנס
 
-עדיין ב-SQL Editor, החלף לכתובות האמיתיות והרץ:
-
-```sql
-insert into allowed_emails (email, note) values
-  ('הכתובת-שלך@gmail.com', 'אבא'),
-  ('הכתובת-של-אשתך@gmail.com', 'אמא');
-```
+קובץ `0003` כבר מכיל את שתי הכתובות:
+`oados112@gmail.com` ו-`lilach451998@gmail.com`.
 
 זו שכבת ההגנה החשובה ביותר: כל ניסיון הרשמה מכתובת אחרת נדחה ברמת בסיס
-הנתונים, גם אם מישהו מגיע ישירות ל-API.
+הנתונים, גם אם מישהו מגיע ישירות ל-API. הוספת אדם נוסף בעתיד לא נעשית
+כאן אלא דרך הזמנה מתוך מסך ההגדרות, שגם קובעת את רמת ההרשאה שלו.
 
 ### 2.3 הגדרות אימות
 

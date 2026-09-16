@@ -74,9 +74,11 @@ export function getDemoEvents(): EventRow[] {
 export function getDemoBaby() {
   return {
     id: "demo-baby",
-    name: "נועם",
-    birth_date: new Date(topOfHour() - 74 * 24 * 3600_000).toISOString().slice(0, 10),
+    name: null as string | null,
+    birth_date: "2026-09-12",
+    birth_time: "23:24",
     sex: "unspecified" as const,
+    birth_weight_g: 2795,
   };
 }
 

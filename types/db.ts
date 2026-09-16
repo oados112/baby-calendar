@@ -59,7 +59,8 @@ export interface FamilyMemberRow {
 export interface BabyRow {
   id: string;
   family_id: string;
-  name: string;
+  /** null בימים הראשונים, לפני שנבחר שם */
+  name: string | null;
   birth_date: string;
   birth_time: string | null;
   sex: "male" | "female" | "unspecified" | null;
@@ -128,10 +129,11 @@ export interface Database {
         Args: {
           p_family_name: string;
           p_display_name: string;
-          p_baby_name: string;
+          p_baby_name: string | null;
           p_birth_date: string;
           p_birth_time?: string | null;
           p_sex?: string;
+          p_birth_weight_g?: number | null;
           p_timezone?: string;
         };
         Returns: { family_id: string; baby_id: string }[];

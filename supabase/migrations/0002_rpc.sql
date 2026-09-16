@@ -12,10 +12,11 @@
 create or replace function create_family_with_baby(
   p_family_name  text,
   p_display_name text,
-  p_baby_name    text,
+  p_baby_name    text,          -- מותר null כשעדיין אין שם
   p_birth_date   date,
   p_birth_time   time default null,
   p_sex          text default 'unspecified',
+  p_birth_weight_g integer default null,
   p_timezone     text default 'Asia/Jerusalem'
 )
 returns table (family_id uuid, baby_id uuid)
@@ -44,8 +45,11 @@ begin
   insert into family_members (family_id, user_id, display_name, role, can_see_medical)
   values (v_family, v_user, p_display_name, 'admin', true);
 
-  insert into babies (family_id, name, birth_date, birth_time, sex)
-  values (v_family, p_baby_name, p_birth_date, p_birth_time, coalesce(p_sex, 'unspecified'))
+  insert into babies (family_id, name, birth_date, birth_time, sex, birth_weight_g)
+  values (
+    v_family, nullif(trim(coalesce(p_baby_name, '')), ''),
+    p_birth_date, p_birth_time, coalesce(p_sex, 'unspecified'), p_birth_weight_g
+  )
   returning id into v_baby;
 
   -- כללי תזכורת התחלתיים, כבויים חוץ מהבסיסיים
