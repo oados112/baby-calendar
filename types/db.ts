@@ -1,6 +1,10 @@
 /**
  * טיפוסי בסיס הנתונים.
  *
+ * שימו לב: שורות הטבלה מוגדרות כ-`type` ולא כ-`interface` בכוונה.
+ * supabase-js דורש שכל Row יתאים ל-Record<string, unknown>; interface לא
+ * מספק אילוץ אינדקס ולכן כל השאילתות היו מתקפלות ל-never.
+ *
  * זמני: נכתב ביד כדי שנוכל לעבוד לפני שהפרויקט ב-Supabase קיים.
  * ברגע שהפרויקט יוקם, הקובץ הזה ייווצר אוטומטית:
  *   npm run db:types
@@ -39,14 +43,14 @@ export type ReminderKind =
 
 export type Json = string | number | boolean | null | { [k: string]: Json } | Json[];
 
-export interface FamilyRow {
+export type FamilyRow = {
   id: string;
   name: string;
   timezone: string;
   created_at: string;
 }
 
-export interface FamilyMemberRow {
+export type FamilyMemberRow = {
   family_id: string;
   user_id: string;
   display_name: string;
@@ -56,7 +60,7 @@ export interface FamilyMemberRow {
   joined_at: string;
 }
 
-export interface BabyRow {
+export type BabyRow = {
   id: string;
   family_id: string;
   /** null בימים הראשונים, לפני שנבחר שם */
@@ -72,7 +76,7 @@ export interface BabyRow {
   created_at: string;
 }
 
-export interface EventRow {
+export type EventRow = {
   id: string;
   baby_id: string;
   family_id: string;
@@ -89,7 +93,7 @@ export interface EventRow {
   deleted_at: string | null;
 }
 
-export interface ActiveTimerRow {
+export type ActiveTimerRow = {
   id: string;
   baby_id: string;
   family_id: string;
@@ -123,7 +127,7 @@ export interface Database {
       >;
       active_timers: TableDef<ActiveTimerRow>;
     };
-    Views: Record<string, never>;
+    Views: { [_ in never]: never };
     Functions: {
       create_family_with_baby: {
         Args: {
@@ -153,6 +157,6 @@ export interface Database {
       event_type: EventType;
       reminder_kind: ReminderKind;
     };
-    CompositeTypes: Record<string, never>;
+    CompositeTypes: { [_ in never]: never };
   };
 }
