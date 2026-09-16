@@ -16,6 +16,17 @@ import { getSupabaseServerClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
+/**
+ * כשל בצד השרת.
+ *
+ * ה-stage מוחזר ללקוח בכוונה: הוא אומר איזה שלב נפל בלי לחשוף פרטים,
+ * וחוסך חפירה בלוגים כשמשהו נשבר. ההודעה המלאה נשארת בלוג בלבד.
+ */
+function fail(stage: string, detail: string) {
+  console.error(`[auth/code] ${stage}: ${detail}`);
+  return NextResponse.json({ error: "server_error", stage }, { status: 500 });
+}
+
 function clientIp(request: NextRequest): string {
   // ב-Vercel הכתובת האמיתית נמצאת בכותרת הזו; היא נקבעת על ידי הפלטפורמה
   const forwarded = request.headers.get("x-forwarded-for");
@@ -51,8 +62,7 @@ export async function POST(request: NextRequest) {
     // חיבור, פונקציה חסרה — חייבת להיראות אחרת, אחרת תקלת תשתית מתחזה
     // לטעות הקלדה של המשתמש ואי אפשר לאתר אותה.
     if (!message.includes("invalid_code")) {
-      console.error("redeem_access_code failed:", message);
-      return NextResponse.json({ error: "server_error" }, { status: 500 });
+      return fail("redeem", message);
     }
 
     return NextResponse.json({ error: "invalid_code" }, { status: 401 });
@@ -74,18 +84,22 @@ export async function POST(request: NextRequest) {
   if (createError) {
     // כבר קיים — מאתרים אותו
     if (!/already|exists|registered/i.test(createError.message)) {
-      return NextResponse.json({ error: "server_error" }, { status: 500 });
+      return fail("create_user", createError.message);
     }
     const { data: list } = await admin.auth.admin.listUsers({ perPage: 200 });
     userId = list?.users.find((u) => u.email?.toLowerCase() === email)?.id;
   }
 
   if (!userId) {
-    return NextResponse.json({ error: "server_error" }, { status: 500 });
+    return fail("find_user", `no auth user for ${email}`);
   }
 
   // 3. צירוף למשפחה לפי מה שהוגדר בקוד
-  await admin.rpc("attach_code_user", { p_code_id: codeId, p_user_id: userId });
+  const { error: attachError } = await admin.rpc("attach_code_user", {
+    p_code_id: codeId,
+    p_user_id: userId,
+  });
+  if (attachError) return fail("attach", attachError.message);
 
   // 4. טוקן כניסה — generateLink מייצר אותו בלי לשלוח מייל
   const { data: link, error: linkError } = await admin.auth.admin.generateLink({
@@ -95,7 +109,7 @@ export async function POST(request: NextRequest) {
 
   const tokenHash = link?.properties?.hashed_token;
   if (linkError || !tokenHash) {
-    return NextResponse.json({ error: "server_error" }, { status: 500 });
+    return fail("generate_link", linkError?.message ?? "no hashed_token returned");
   }
 
   // 5. פדיון הטוקן בלקוח שכותב את העוגיות לתשובה
@@ -106,7 +120,7 @@ export async function POST(request: NextRequest) {
   });
 
   if (verifyError) {
-    return NextResponse.json({ error: "server_error" }, { status: 500 });
+    return fail("verify", verifyError.message);
   }
 
   return NextResponse.json({ ok: true });
