@@ -37,10 +37,11 @@ export default async function proxy(request: NextRequest) {
     },
   );
 
-  // חשוב: getUser ולא getSession — מאמת מול השרת ומרענן את הטוקן
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // getClaims מאמת את חתימת הטוקן מקומית (מול מפתח ציבורי במטמון) ומרענן
+  // אותו כשצריך. getUser, שהיה כאן קודם, פנה לשרת האימות בכל בקשה —
+  // נסיעת רשת שהתווספה לכל ניווט ולכל טעינת נכס.
+  const { data: claims } = await supabase.auth.getClaims();
+  const user = claims?.claims?.sub ? { id: claims.claims.sub } : null;
 
   const { pathname } = request.nextUrl;
 

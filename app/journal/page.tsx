@@ -5,7 +5,6 @@ import { DEMO_MEMBER_NAMES, getDemoWeek } from "@/lib/demo-data";
 import {
   getEventsBetween,
   getFamilyContext,
-  getFamilyTimezone,
   getMemberNames,
 } from "@/lib/data/family";
 import { summarizeDays } from "@/lib/stats";
@@ -44,7 +43,7 @@ export default async function JournalPage({ searchParams }: PageProps<"/journal"
   const baby = context.babies[0];
   if (!baby) redirect("/onboarding");
 
-  const timeZone = await getFamilyTimezone(context.member.family_id);
+  const timeZone = context.timeZone;
   const todayKey = toDayKey(new Date(), timeZone);
 
   // פרמטר לא תקין לא שובר את הדף — פשוט מציגים את היום

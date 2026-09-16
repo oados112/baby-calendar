@@ -2,11 +2,7 @@ import { redirect } from "next/navigation";
 import { WeekView } from "@/components/week-view";
 import { isSupabaseConfigured } from "@/lib/config";
 import { getDemoWeek } from "@/lib/demo-data";
-import {
-  getEventsBetween,
-  getFamilyContext,
-  getFamilyTimezone,
-} from "@/lib/data/family";
+import { getEventsBetween, getFamilyContext } from "@/lib/data/family";
 import { sleepHeatmap, summarizeDays } from "@/lib/stats";
 import { dayKey as toDayKey, dayRange, lastDayKeys } from "@/lib/zoned";
 
@@ -33,7 +29,7 @@ export default async function StatsPage() {
   const baby = context.babies[0];
   if (!baby) redirect("/onboarding");
 
-  const timeZone = await getFamilyTimezone(context.member.family_id);
+  const timeZone = context.timeZone;
   const todayKey = toDayKey(new Date(), timeZone);
   const keys = lastDayKeys(todayKey, 7);
 

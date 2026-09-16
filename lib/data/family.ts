@@ -3,28 +3,40 @@ import type { ActiveTimerRow, BabyRow, EventRow, FamilyMemberRow } from "@/types
 
 /**
  * שאילתות צד-שרת.
+ *
  * כולן עוברות דרך לקוח ה-anon ולכן כפופות ל-RLS — מה שהמשתמש לא רשאי
  * לראות פשוט לא יחזור, בלי שנצטרך לסנן כאן שוב.
+ *
+ * הערה על מהירות: זיהוי המשתמש נעשה ב-getClaims(), שמאמת את הטוקן
+ * מקומית מול מפתח ציבורי במטמון. getUser() לעומתו פונה לשרת האימות
+ * בכל בקשה, וזו הייתה נסיעת רשת מיותרת בכל מעבר בין עמודים.
  */
 
 export interface FamilyContext {
   member: FamilyMemberRow;
   babies: BabyRow[];
+  timeZone: string;
+}
+
+export async function currentUserId(): Promise<string | null> {
+  const supabase = await getSupabaseServerClient();
+  const { data } = await supabase.auth.getClaims();
+  const sub = data?.claims?.sub;
+  return typeof sub === "string" ? sub : null;
 }
 
 /** null = המשתמש מחובר אך עדיין לא שייך למשפחה (צריך onboarding). */
 export async function getFamilyContext(): Promise<FamilyContext | null> {
   const supabase = await getSupabaseServerClient();
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return null;
+  const userId = await currentUserId();
+  if (!userId) return null;
 
+  // חברות + אזור הזמן של המשפחה בשאילתה אחת במקום בשתיים
   const { data: member } = await supabase
     .from("family_members")
-    .select("*")
-    .eq("user_id", user.id)
+    .select("*, families(timezone)")
+    .eq("user_id", userId)
     .maybeSingle();
 
   if (!member) return null;
@@ -36,7 +48,15 @@ export async function getFamilyContext(): Promise<FamilyContext | null> {
     .eq("is_active", true)
     .order("sort_order", { ascending: true });
 
-  return { member, babies: babies ?? [] };
+  const joined = member as FamilyMemberRow & {
+    families?: { timezone?: string } | null;
+  };
+
+  return {
+    member,
+    babies: babies ?? [],
+    timeZone: joined.families?.timezone ?? "Asia/Jerusalem",
+  };
 }
 
 /** אירועי היממה האחרונה של תינוק, החדש ביותר קודם. */
@@ -98,16 +118,4 @@ export async function getEventsBetween(
     .order("started_at", { ascending: false });
 
   return data ?? [];
-}
-
-/** אזור הזמן של המשפחה — הבסיס לכל חישובי "יום". */
-export async function getFamilyTimezone(familyId: string): Promise<string> {
-  const supabase = await getSupabaseServerClient();
-  const { data } = await supabase
-    .from("families")
-    .select("timezone")
-    .eq("id", familyId)
-    .maybeSingle();
-
-  return data?.timezone ?? "Asia/Jerusalem";
 }

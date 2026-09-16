@@ -30,6 +30,8 @@ export function PageNav() {
           <Link
             key={tab.href}
             href={tab.href}
+            // טעינה מראש: העמוד מוכן עוד לפני הלחיצה, כך שהמעבר מיידי
+            prefetch
             aria-current={active ? "page" : undefined}
             className={[
               "flex min-h-tap flex-1 items-center justify-center rounded-md text-[0.875rem] transition-colors duration-150",
