@@ -1,70 +1,60 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { getSupabaseBrowserClient } from "@/lib/supabase/client";
-import { getSiteOrigin } from "@/lib/config";
-import { Button, TextField } from "@/components/ui";
+import { Button } from "@/components/ui";
 import { IconBaby } from "@/components/icons";
 
 /**
- * תרגום שגיאות Supabase להודעה שאפשר לפעול לפיה.
+ * כניסה בקוד אישי.
  *
- * באתר ציבורי היינו מסתירים את ההבדל בין "כתובת לא מורשית" ל"תקלה", כדי
- * לא לאפשר גילוי משתמשים. כאן הרשימה סגורה וידועה לשני ההורים, ולכן
- * הודעה מדויקת שווה הרבה יותר מהסתרה שלא מגינה על אף אחד.
+ * כל אדם מקבל קוד קבוע במקום מייל: אין למה לחכות, אין ספאם ואין תלות
+ * בשירות חיצוני. הקוד הוא בפועל סיסמה — הוא נשלח לשרת ונבדק שם מול
+ * hash, והדפדפן לא שומר אותו בשום מקום.
  */
-function describeAuthError(message: string, status?: number): string {
-  const m = message.toLowerCase();
 
-  // הטריגר של הרשימה הלבנה דוחה יצירת משתמש
-  if (m.includes("database error saving new user")) {
-    return "הכתובת הזו אינה ברשימת המורשים. בדקו שהקלדתם נכון, או בקשו הזמנה.";
-  }
-  if (m.includes("rate limit") || status === 429) {
-    return "נשלחו יותר מדי בקשות. נסו שוב בעוד כמה דקות.";
-  }
-  if (m.includes("invalid") && m.includes("email")) {
-    return "כתובת המייל אינה תקינה.";
-  }
-  if (m.includes("signups not allowed") || m.includes("disabled")) {
-    return "ההרשמה סגורה כרגע. פנו למנהל היומן.";
-  }
-  return "לא הצלחנו לשלוח את הקישור. נסו שוב בעוד רגע.";
-}
+const MESSAGES: Record<string, string> = {
+  invalid_code: "הקוד אינו נכון. בדקו שהקלדתם אותו במלואו.",
+  too_many_attempts: "יותר מדי ניסיונות. נסו שוב בעוד רבע שעה.",
+  server_error: "משהו השתבש אצלנו. נסו שוב בעוד רגע.",
+};
 
-/**
- * התחברות בקישור למייל (Magic Link).
- *
- * אין סיסמאות: אין מה לשכוח, אין מה לגנוב, ואין מה לנהל.
- * ההגנה האמיתית היא הרשימה הלבנה בבסיס הנתונים — כתובת שאינה מורשית
- * לא תיצור משתמש גם אם תבקש קישור.
- */
 export function LoginForm({ initialError }: { initialError?: string }) {
-  const [email, setEmail] = useState("");
-  const [status, setStatus] = useState<"idle" | "sending" | "sent">("idle");
+  const router = useRouter();
+  const [code, setCode] = useState("");
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(initialError ?? null);
+
+  const ready = code.trim().length >= 6;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const address = email.trim().toLowerCase();
-    if (!address) return;
+    if (!ready || busy) return;
 
-    setStatus("sending");
+    setBusy(true);
     setError(null);
 
-    const supabase = getSupabaseBrowserClient();
-    const { error } = await supabase.auth.signInWithOtp({
-      email: address,
-      options: { emailRedirectTo: `${getSiteOrigin()}/auth/callback` },
-    });
+    try {
+      const response = await fetch("/api/auth/code", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: code.trim() }),
+      });
 
-    if (error) {
-      setStatus("idle");
-      setError(describeAuthError(error.message, error.status));
-      return;
+      if (!response.ok) {
+        const { error: reason } = await response.json().catch(() => ({}));
+        setError(MESSAGES[reason] ?? MESSAGES.server_error);
+        setBusy(false);
+        return;
+      }
+
+      // הסשן נכתב בעוגיות על ידי השרת; רענון כדי שהשרת יזהה אותנו
+      router.replace("/");
+      router.refresh();
+    } catch {
+      setError("אין חיבור לרשת. בדקו את החיבור ונסו שוב.");
+      setBusy(false);
     }
-
-    setStatus("sent");
   }
 
   return (
@@ -78,59 +68,65 @@ export function LoginForm({ initialError }: { initialError?: string }) {
         </span>
         <h1 className="text-2xl font-semibold text-strong">היומן של התינוק</h1>
         <p className="mt-1.5 text-[0.9375rem] text-muted">
-          מעקב האכלות, שינה וחיתולים — משותף לשניכם
+          מעקב האכלות, שינה וחיתולים — משותף לכל המשפחה
         </p>
       </div>
 
-      {status === "sent" ? (
-        <div
-          role="status"
-          className="rounded-lg border border-subtle bg-surface-card p-5 text-center"
-        >
-          <h2 className="text-[1.0625rem] font-semibold text-strong">
-            הקישור בדרך אליכם
-          </h2>
-          <p className="mt-2 text-[0.9375rem] leading-relaxed text-muted">
-            שלחנו מייל ל־<span className="text-default">{email.trim()}</span>.
-            פתחו אותו מהמכשיר הזה כדי להיכנס.
-          </p>
-          <p className="mt-3 text-[0.8125rem] text-faint">
-            לא הגיע? בדקו בספאם, או המתינו דקה ונסו שוב.
-          </p>
-          <Button
-            variant="ghost"
-            fullWidth
-            className="mt-4"
-            onClick={() => setStatus("idle")}
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4" noValidate>
+        <div className="flex flex-col gap-2">
+          <label
+            htmlFor="access-code"
+            className="text-center text-[0.875rem] font-medium text-default"
           >
-            שליחה לכתובת אחרת
-          </Button>
-        </div>
-      ) : (
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4" noValidate>
-          <TextField
-            label="כתובת המייל"
-            type="email"
-            inputMode="email"
-            autoComplete="email"
+            הקוד האישי שלך
+          </label>
+          <input
+            id="access-code"
+            type="password"
+            value={code}
+            onChange={(e) => {
+              setCode(e.target.value);
+              if (error) setError(null);
+            }}
             autoFocus
-            required
+            autoComplete="current-password"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
             dir="ltr"
-            className="text-start"
-            placeholder="you@example.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            error={error}
-            hint="נשלח אליכם קישור כניסה. אין צורך בסיסמה."
+            aria-invalid={error ? true : undefined}
+            aria-describedby={error ? "code-error" : "code-hint"}
+            className={[
+              "min-h-tap-hero rounded-lg border bg-surface-sunken px-4 text-center",
+              // 1rem לפחות, אחרת iOS מגדיל את המסך בכניסה לשדה
+              "text-[1.25rem] tracking-[0.12em] text-strong",
+              "placeholder:tracking-normal placeholder:text-faint",
+              "transition-colors duration-150",
+              error ? "border-late" : "border-line focus:border-accent",
+            ].join(" ")}
           />
-          <Button type="submit" fullWidth loading={status === "sending"}>
-            {status === "sending" ? "שולח…" : "שליחת קישור כניסה"}
-          </Button>
-        </form>
-      )}
+          {error ? (
+            <p
+              id="code-error"
+              role="alert"
+              className="text-center text-[0.8125rem] text-late"
+            >
+              {error}
+            </p>
+          ) : (
+            <p id="code-hint" className="text-center text-[0.8125rem] text-muted">
+              הקוד שקיבלתם. אין צורך במייל ואין סיסמה לזכור.
+            </p>
+          )}
+        </div>
+
+        <Button type="submit" fullWidth loading={busy} disabled={!ready}>
+          {busy ? "נכנס…" : "כניסה"}
+        </Button>
+      </form>
 
       <p className="mt-8 text-center text-[0.75rem] leading-relaxed text-faint">
-        האתר פרטי. רק כתובות שאושרו מראש יכולות להיכנס.
+        האתר פרטי. הכניסה אפשרית רק עם קוד אישי שהונפק מראש.
       </p>
     </main>
   );
