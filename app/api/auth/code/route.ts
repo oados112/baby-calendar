@@ -22,9 +22,14 @@ export const runtime = "nodejs";
  * ה-stage מוחזר ללקוח בכוונה: הוא אומר איזה שלב נפל בלי לחשוף פרטים,
  * וחוסך חפירה בלוגים כשמשהו נשבר. ההודעה המלאה נשארת בלוג בלבד.
  */
-function fail(stage: string, detail: string) {
+function fail(stage: string, detail: string, dbCode?: string) {
   console.error(`[auth/code] ${stage}: ${detail}`);
-  return NextResponse.json({ error: "server_error", stage }, { status: 500 });
+  // קוד שגיאת Postgres (למשל 42501 = אין הרשאה) — מזהה תקלה בלי לחשוף
+  // שום מידע על הנתונים עצמם
+  return NextResponse.json(
+    { error: "server_error", stage, db_code: dbCode },
+    { status: 500 },
+  );
 }
 
 function clientIp(request: NextRequest): string {
@@ -62,7 +67,7 @@ export async function POST(request: NextRequest) {
     // חיבור, פונקציה חסרה — חייבת להיראות אחרת, אחרת תקלת תשתית מתחזה
     // לטעות הקלדה של המשתמש ואי אפשר לאתר אותה.
     if (!message.includes("invalid_code")) {
-      return fail("redeem", message);
+      return fail("redeem", message, redeemError?.code);
     }
 
     return NextResponse.json({ error: "invalid_code" }, { status: 401 });
