@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui";
 import { IconBreast, IconSleep, IconStop } from "@/components/icons";
 import { formatDuration } from "@/lib/time";
-import { cancelTimer, switchSide, type LogInput } from "@/lib/data/log";
+import { cancelTimer, nextSideState, switchSide, type LogInput } from "@/lib/data/log";
+import { isPending } from "@/lib/use-live-data";
 import type { ActiveTimerRow } from "@/types/db";
 
 /**
@@ -34,12 +35,17 @@ export function TimerPanel({
   babyId,
   timers,
   submit,
+  removeTimer,
+  patchTimer,
   onError,
 }: {
   babyId: string;
   timers: ActiveTimerRow[];
   /** רושם את הסשן שהסתיים — מופיע ברשימה מיד */
   submit: (input: LogInput) => void;
+  /** מסיר את הטיימר מהמסך מיד; restore מחזיר אותו אם הרשת נכשלה */
+  removeTimer: (id: string) => { restore: () => void };
+  patchTimer: (id: string, patch: Partial<ActiveTimerRow>) => { rollback: () => void };
   onError: (message: string) => void;
 }) {
   const breast = timers.find((t) => t.type === "feed_breast") ?? null;
@@ -54,11 +60,19 @@ export function TimerPanel({
           babyId={babyId}
           timer={breast}
           submit={submit}
+          removeTimer={removeTimer}
+          patchTimer={patchTimer}
           onError={onError}
         />
       ) : null}
       {sleep ? (
-        <SleepTimer babyId={babyId} timer={sleep} submit={submit} onError={onError} />
+        <SleepTimer
+          babyId={babyId}
+          timer={sleep}
+          submit={submit}
+          removeTimer={removeTimer}
+          onError={onError}
+        />
       ) : null}
     </section>
   );
@@ -68,32 +82,44 @@ function BreastTimer({
   babyId,
   timer,
   submit,
+  removeTimer,
+  patchTimer,
   onError,
 }: {
   babyId: string;
   timer: ActiveTimerRow;
   submit: (input: LogInput) => void;
+  removeTimer: (id: string) => { restore: () => void };
+  patchTimer: (id: string, patch: Partial<ActiveTimerRow>) => { rollback: () => void };
   onError: (m: string) => void;
 }) {
   useSeconds(true);
-  const [busy, setBusy] = useState(false);
+  // טיימר שעדיין לא אושר בשרת: אפשר לראות אותו, אבל לא לשנות אותו
+  const pending = isPending(timer.id);
+
+  /** מסיים את הטיימר: נעלם מהמסך מיד, והרשת ממשיכה ברקע. */
+  function stop(save: boolean) {
+    if (save) {
+      submit({
+        babyId,
+        type: "feed_breast",
+        startedAt: new Date(timer.started_at),
+        endedAt: new Date(),
+        data: { left_sec: left, right_sec: right, last_side: timer.side },
+      });
+    }
+
+    const { restore } = removeTimer(timer.id);
+    cancelTimer(babyId, "feed_breast").catch((e: unknown) => {
+      restore();
+      onError(e instanceof Error ? e.message : "לא הצלחנו לעצור את הטיימר");
+    });
+  }
 
   const segment = elapsedSeconds(timer.segment_started_at);
   const left = timer.left_sec + (timer.side === "left" ? segment : 0);
   const right = timer.right_sec + (timer.side === "right" ? segment : 0);
   const total = left + right;
-
-  async function act(fn: () => Promise<unknown>) {
-    if (busy) return;
-    setBusy(true);
-    try {
-      await fn();
-    } catch (e) {
-      onError(e instanceof Error ? e.message : "הפעולה נכשלה");
-    } finally {
-      setBusy(false);
-    }
-  }
 
   return (
     <div className="rounded-lg border border-feed/30 bg-feed-soft p-3.5">
@@ -117,19 +143,17 @@ function BreastTimer({
             <button
               key={side}
               type="button"
-              disabled={busy}
-              onClick={() =>
-                active
-                  ? undefined
-                  : act(() =>
-                      switchSide(timer.id, {
-                        side: timer.side,
-                        leftSec: timer.left_sec,
-                        rightSec: timer.right_sec,
-                        segmentStartedAt: timer.segment_started_at,
-                      }),
-                    )
-              }
+              disabled={pending}
+              onClick={() => {
+                if (active || pending) return;
+                // הצד מתחלף על המסך מיד; השרת מתיישר אחריו
+                const patch = nextSideState(timer);
+                const { rollback } = patchTimer(timer.id, patch);
+                switchSide(timer.id, patch).catch((e: unknown) => {
+                  rollback();
+                  onError(e instanceof Error ? e.message : "החלפת הצד נכשלה");
+                });
+              }}
               aria-pressed={active}
               className={[
                 "min-h-tap-comfy rounded-md border px-3 text-start transition-colors duration-150",
@@ -154,26 +178,16 @@ function BreastTimer({
         <Button
           variant="primary"
           fullWidth
-          disabled={busy}
-          onClick={() => {
-            // הרישום נשלח קודם ומופיע מיד; עצירת הטיימר ממשיכה ברקע
-            submit({
-              babyId,
-              type: "feed_breast",
-              startedAt: new Date(timer.started_at),
-              endedAt: new Date(),
-              data: { left_sec: left, right_sec: right, last_side: timer.side },
-            });
-            act(() => cancelTimer(babyId, "feed_breast"));
-          }}
+          disabled={pending}
+          onClick={() => stop(true)}
         >
           <IconStop className="size-4" />
           סיום ושמירה
         </Button>
         <Button
           variant="secondary"
-          disabled={busy}
-          onClick={() => act(() => cancelTimer(babyId, "feed_breast"))}
+          disabled={pending}
+          onClick={() => stop(false)}
         >
           ביטול
         </Button>
@@ -186,27 +200,34 @@ function SleepTimer({
   babyId,
   timer,
   submit,
+  removeTimer,
   onError,
 }: {
   babyId: string;
   timer: ActiveTimerRow;
   submit: (input: LogInput) => void;
+  removeTimer: (id: string) => { restore: () => void };
   onError: (m: string) => void;
 }) {
   useSeconds(true);
-  const [busy, setBusy] = useState(false);
+  const pending = isPending(timer.id);
   const total = elapsedSeconds(timer.started_at);
 
-  async function act(fn: () => Promise<unknown>) {
-    if (busy) return;
-    setBusy(true);
-    try {
-      await fn();
-    } catch (e) {
-      onError(e instanceof Error ? e.message : "הפעולה נכשלה");
-    } finally {
-      setBusy(false);
+  function stop(save: boolean) {
+    if (save) {
+      submit({
+        babyId,
+        type: "sleep",
+        startedAt: new Date(timer.started_at),
+        endedAt: new Date(),
+      });
     }
+
+    const { restore } = removeTimer(timer.id);
+    cancelTimer(babyId, "sleep").catch((e: unknown) => {
+      restore();
+      onError(e instanceof Error ? e.message : "לא הצלחנו לעצור את הטיימר");
+    });
   }
 
   return (
@@ -227,24 +248,16 @@ function SleepTimer({
         <Button
           variant="primary"
           fullWidth
-          disabled={busy}
-          onClick={() => {
-            submit({
-              babyId,
-              type: "sleep",
-              startedAt: new Date(timer.started_at),
-              endedAt: new Date(),
-            });
-            act(() => cancelTimer(babyId, "sleep"));
-          }}
+          disabled={pending}
+          onClick={() => stop(true)}
         >
           <IconStop className="size-4" />
           התעורר/ה
         </Button>
         <Button
           variant="secondary"
-          disabled={busy}
-          onClick={() => act(() => cancelTimer(babyId, "sleep"))}
+          disabled={pending}
+          onClick={() => stop(false)}
         >
           ביטול
         </Button>

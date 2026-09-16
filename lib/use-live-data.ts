@@ -42,7 +42,13 @@ export interface LiveData {
     rollback: () => void;
   };
   removeOptimistic: (id: string) => { restore: () => void };
-  setTimers: (next: ActiveTimerRow[]) => void;
+  /** מציג טיימר מיד; מחזיר פונקציות לאישור או לביטול */
+  addTimer: (timer: ActiveTimerRow) => {
+    confirm: (real: ActiveTimerRow) => void;
+    rollback: () => void;
+  };
+  patchTimer: (id: string, patch: Partial<ActiveTimerRow>) => { rollback: () => void };
+  removeTimer: (id: string) => { restore: () => void };
 }
 
 export function useLiveData({
@@ -108,6 +114,53 @@ export function useLiveData({
     };
   }, []);
 
+  const addTimer = useCallback((timer: ActiveTimerRow) => {
+    setTimers((current) => [...current.filter((t) => t.type !== timer.type), timer]);
+
+    return {
+      confirm: (real: ActiveTimerRow) =>
+        setTimers((current) => [
+          ...current.filter((t) => t.id !== timer.id && t.id !== real.id),
+          real,
+        ]),
+      rollback: () =>
+        setTimers((current) => current.filter((t) => t.id !== timer.id)),
+    };
+  }, []);
+
+  const patchTimer = useCallback((id: string, patch: Partial<ActiveTimerRow>) => {
+    let before: ActiveTimerRow | undefined;
+    setTimers((current) =>
+      current.map((t) => {
+        if (t.id !== id) return t;
+        before = t;
+        return { ...t, ...patch };
+      }),
+    );
+
+    return {
+      rollback: () =>
+        setTimers((current) =>
+          before ? current.map((t) => (t.id === id ? before! : t)) : current,
+        ),
+    };
+  }, []);
+
+  const removeTimer = useCallback((id: string) => {
+    let removed: ActiveTimerRow | undefined;
+    setTimers((current) => {
+      removed = current.find((t) => t.id === id);
+      return current.filter((t) => t.id !== id);
+    });
+
+    return {
+      restore: () =>
+        setTimers((current) =>
+          removed && !current.some((t) => t.id === id) ? [...current, removed] : current,
+        ),
+    };
+  }, []);
+
   // סנכרון חי בין המכשירים — החלה נקודתית, בלי בניית דף מחדש
   useEffect(() => {
     if (!enabled) return;
@@ -155,7 +208,10 @@ export function useLiveData({
               return current.filter((t) => t.id !== (row?.id ?? old?.id));
             }
             if (!row) return current;
-            const without = current.filter((t) => t.id !== row.id);
+            // מסירים גם טיימר זמני מאותו סוג, אחרת הוא יוצג פעמיים
+            const without = current.filter(
+              (t) => t.id !== row.id && !(isPending(t.id) && t.type === row.type),
+            );
             return [...without, row];
           });
         },
@@ -167,5 +223,13 @@ export function useLiveData({
     };
   }, [babyId, enabled]);
 
-  return { events, timers, addOptimistic, removeOptimistic, setTimers };
+  return {
+    events,
+    timers,
+    addOptimistic,
+    removeOptimistic,
+    addTimer,
+    patchTimer,
+    removeTimer,
+  };
 }

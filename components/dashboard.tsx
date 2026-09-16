@@ -5,6 +5,7 @@ import { SinceCard } from "@/components/since-card";
 import { Sheet } from "@/components/sheet";
 import { TimerPanel } from "@/components/timer-panel";
 import { PageNav } from "@/components/page-nav";
+import { ThemeToggle } from "@/components/theme-toggle";
 import {
   BottleForm,
   DiaperForm,
@@ -106,7 +107,15 @@ export function Dashboard({
   currentUserId,
   demo = false,
 }: DashboardProps) {
-  const { events, timers, addOptimistic, removeOptimistic } = useLiveData({
+  const {
+    events,
+    timers,
+    addOptimistic,
+    removeOptimistic,
+    addTimer,
+    patchTimer,
+    removeTimer,
+  } = useLiveData({
     babyId: baby.id,
     initialEvents,
     initialTimers,
@@ -162,7 +171,7 @@ export function Dashboard({
 
       const { confirm, rollback } = addOptimistic(optimistic);
 
-      logEvent(input)
+      logEvent(input, currentUserId ?? "")
         .then(({ id }) => confirm({ ...optimistic, id }))
         .catch((e: unknown) => {
           rollback();
@@ -206,15 +215,35 @@ export function Dashboard({
     [demo, removeOptimistic, submit],
   );
 
+  /** הטיימר מופיע על המסך מיד; ההרשמה בשרת ממשיכה ברקע. */
   function startTimerNow(type: "feed_breast" | "sleep", side?: "left" | "right") {
     setSheet(null);
     if (demo) {
       setToast("זו תצוגה לדוגמה — הטיימר יעבוד אחרי ההתחברות");
       return;
     }
-    startTimer(baby.id, type, side).catch((e: unknown) =>
-      setToast(e instanceof Error ? e.message : "לא הצלחנו להתחיל את הטיימר"),
-    );
+
+    const now = new Date().toISOString();
+    const { confirm, rollback } = addTimer({
+      id: makeTempId(),
+      baby_id: baby.id,
+      family_id: "",
+      type,
+      side: side ?? null,
+      left_sec: 0,
+      right_sec: 0,
+      started_at: now,
+      segment_started_at: now,
+      paused_at: null,
+      started_by: currentUserId ?? "",
+    });
+
+    startTimer(baby.id, type, currentUserId ?? "", side)
+      .then(confirm)
+      .catch((e: unknown) => {
+        rollback();
+        setToast(e instanceof Error ? e.message : "לא הצלחנו להתחיל את הטיימר");
+      });
   }
 
   return (
@@ -234,6 +263,8 @@ export function Dashboard({
             </p>
           </div>
         </div>
+
+        <ThemeToggle />
       </header>
 
       <PageNav />
@@ -243,6 +274,8 @@ export function Dashboard({
           babyId={baby.id}
           timers={timers}
           submit={submit}
+          removeTimer={removeTimer}
+          patchTimer={patchTimer}
           onError={setToast}
         />
 

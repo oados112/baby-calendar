@@ -1,14 +1,17 @@
 "use client";
 
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
-import type { EventType, Json } from "@/types/db";
+import type { ActiveTimerRow, EventType, Json } from "@/types/db";
 
 /**
  * כתיבת רישומים מהדפדפן.
  *
- * הכתיבה נעשית ישירות מול Supabase ולא דרך השרת שלנו — ה-RLS כבר אוכף
- * מי רשאי לכתוב מה, אז שרת ביניים רק היה מוסיף השהיה. זה גם מה שמאפשר
- * ל-Realtime לעדכן את המכשיר השני תוך שנייה.
+ * הכתיבה ישירה מול Supabase ולא דרך השרת שלנו — ה-RLS כבר אוכף מי רשאי
+ * לכתוב מה, אז שרת ביניים רק היה מוסיף השהיה.
+ *
+ * שימו לב ש-userId מגיע כפרמטר ואיננו נשלף כאן. זה מכוון: קריאה ל-
+ * auth.getUser() פונה לרשת, וכשהיא קדמה לכל כתיבה היא הכפילה את זמן
+ * התגובה של כל לחיצה. מזהה המשתמש ידוע ממילא בשרת ומועבר לדף.
  */
 
 export interface LogInput {
@@ -20,13 +23,11 @@ export interface LogInput {
   note?: string | null;
 }
 
-export async function logEvent(input: LogInput): Promise<{ id: string }> {
+export async function logEvent(
+  input: LogInput,
+  userId: string,
+): Promise<{ id: string }> {
   const supabase = getSupabaseBrowserClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("נדרשת התחברות");
 
   const { data, error } = await supabase
     .from("events")
@@ -39,7 +40,7 @@ export async function logEvent(input: LogInput): Promise<{ id: string }> {
       ended_at: input.endedAt ? input.endedAt.toISOString() : null,
       data: (input.data ?? {}) as Json,
       note: input.note?.trim() || null,
-      created_by: user.id,
+      created_by: userId,
     })
     .select("id")
     .single();
@@ -58,36 +59,38 @@ export async function deleteEvent(eventId: string): Promise<void> {
 /**
  * טיימר משותף.
  *
- * הטיימר חי בשרת ולא בדפדפן: כך הוא ממשיך לרוץ כשהמסך נכבה, שורד רענון,
- * ונראה בו-זמנית בשני המכשירים. הדפדפן רק מחשב כמה זמן עבר מ-started_at.
+ * הטיימר נשמר בשרת ולא בדפדפן: כך הוא ממשיך לרוץ כשהמסך נעול, שורד
+ * רענון, ונראה בו-זמנית בשני המכשירים. הדפדפן רק מחשב כמה זמן עבר.
  */
 export async function startTimer(
   babyId: string,
   type: EventType,
+  userId: string,
   side?: "left" | "right",
-): Promise<void> {
+): Promise<ActiveTimerRow> {
   const supabase = getSupabaseBrowserClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("נדרשת התחברות");
-
   const now = new Date().toISOString();
-  const { error } = await supabase.from("active_timers").upsert(
-    {
-      baby_id: babyId,
-      type,
-      side: side ?? null,
-      started_at: now,
-      segment_started_at: now,
-      left_sec: 0,
-      right_sec: 0,
-      started_by: user.id,
-    },
-    { onConflict: "baby_id,type" },
-  );
+
+  const { data, error } = await supabase
+    .from("active_timers")
+    .upsert(
+      {
+        baby_id: babyId,
+        type,
+        side: side ?? null,
+        started_at: now,
+        segment_started_at: now,
+        left_sec: 0,
+        right_sec: 0,
+        started_by: userId,
+      },
+      { onConflict: "baby_id,type" },
+    )
+    .select("*")
+    .single();
 
   if (error) throw new Error(error.message);
+  return data;
 }
 
 export async function cancelTimer(babyId: string, type: EventType): Promise<void> {
@@ -101,24 +104,28 @@ export async function cancelTimer(babyId: string, type: EventType): Promise<void
 }
 
 /** החלפת צד בהנקה: צוברים את הזמן של הצד הנוכחי וממשיכים בשני. */
-export async function switchSide(
-  timerId: string,
-  current: { side: "left" | "right" | null; leftSec: number; rightSec: number; segmentStartedAt: string },
-): Promise<void> {
-  const supabase = getSupabaseBrowserClient();
+export function nextSideState(current: ActiveTimerRow): Partial<ActiveTimerRow> {
   const elapsed = Math.floor(
-    (Date.now() - new Date(current.segmentStartedAt).getTime()) / 1000,
+    (Date.now() - new Date(current.segment_started_at).getTime()) / 1000,
   );
 
-  const next = current.side === "left" ? "right" : "left";
+  return {
+    side: current.side === "left" ? "right" : "left",
+    left_sec: current.side === "left" ? current.left_sec + elapsed : current.left_sec,
+    right_sec:
+      current.side === "right" ? current.right_sec + elapsed : current.right_sec,
+    segment_started_at: new Date().toISOString(),
+  };
+}
+
+export async function switchSide(
+  timerId: string,
+  patch: Partial<ActiveTimerRow>,
+): Promise<void> {
+  const supabase = getSupabaseBrowserClient();
   const { error } = await supabase
     .from("active_timers")
-    .update({
-      side: next,
-      left_sec: current.side === "left" ? current.leftSec + elapsed : current.leftSec,
-      right_sec: current.side === "right" ? current.rightSec + elapsed : current.rightSec,
-      segment_started_at: new Date().toISOString(),
-    })
+    .update(patch)
     .eq("id", timerId);
 
   if (error) throw new Error(error.message);
