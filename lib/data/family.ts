@@ -1,5 +1,5 @@
 import { getSupabaseServerClient } from "@/lib/supabase/server";
-import type { BabyRow, EventRow, FamilyMemberRow } from "@/types/db";
+import type { ActiveTimerRow, BabyRow, EventRow, FamilyMemberRow } from "@/types/db";
 
 /**
  * שאילתות צד-שרת.
@@ -69,4 +69,14 @@ export async function getMemberNames(
     .eq("family_id", familyId);
 
   return Object.fromEntries((data ?? []).map((m) => [m.user_id, m.display_name]));
+}
+
+/** טיימרים שרצים כרגע — משותפים לכל המכשירים של המשפחה. */
+export async function getActiveTimers(babyId: string): Promise<ActiveTimerRow[]> {
+  const supabase = await getSupabaseServerClient();
+  const { data } = await supabase
+    .from("active_timers")
+    .select("*")
+    .eq("baby_id", babyId);
+  return data ?? [];
 }
