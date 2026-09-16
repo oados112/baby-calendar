@@ -80,3 +80,34 @@ export async function getActiveTimers(babyId: string): Promise<ActiveTimerRow[]>
     .eq("baby_id", babyId);
   return data ?? [];
 }
+
+/** אירועים בטווח זמן נתון, מהחדש לישן. */
+export async function getEventsBetween(
+  babyId: string,
+  from: Date,
+  to: Date,
+): Promise<EventRow[]> {
+  const supabase = await getSupabaseServerClient();
+  const { data } = await supabase
+    .from("events")
+    .select("*")
+    .eq("baby_id", babyId)
+    .is("deleted_at", null)
+    .gte("started_at", from.toISOString())
+    .lt("started_at", to.toISOString())
+    .order("started_at", { ascending: false });
+
+  return data ?? [];
+}
+
+/** אזור הזמן של המשפחה — הבסיס לכל חישובי "יום". */
+export async function getFamilyTimezone(familyId: string): Promise<string> {
+  const supabase = await getSupabaseServerClient();
+  const { data } = await supabase
+    .from("families")
+    .select("timezone")
+    .eq("id", familyId)
+    .maybeSingle();
+
+  return data?.timezone ?? "Asia/Jerusalem";
+}

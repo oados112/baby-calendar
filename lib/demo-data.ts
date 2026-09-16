@@ -86,3 +86,39 @@ export const DEMO_MEMBER_NAMES: Record<string, string> = {
   "demo-user-1": "אוהד",
   "demo-user-2": "אשתי",
 };
+
+/**
+ * שבוע של נתוני דוגמה: אותו דפוס יומי, עם שינוי קל בין הימים.
+ * משמש רק את מצב התצוגה, כדי שאפשר יהיה לבחון את מסכי המגמות.
+ */
+export function getDemoWeek(): EventRow[] {
+  const base = topOfHour();
+  const out: EventRow[] = [];
+
+  for (let back = 0; back < 7; back++) {
+    const dayOffset = back * 24 * 60;
+    SPECS.forEach((spec, i) => {
+      const jitter = ((back * 7 + i) % 5) * 11;
+      const minutes = spec.minutesAgo + dayOffset + jitter;
+      const at = (m: number) => new Date(base - m * 60_000).toISOString();
+      out.push({
+        id: `demo-w-${back}-${i}`,
+        baby_id: "demo-baby",
+        family_id: "demo-family",
+        type: spec.type,
+        started_at: at(minutes),
+        ended_at: spec.durationMin ? at(minutes - spec.durationMin) : null,
+        data: (spec.data ?? {}) as EventRow["data"],
+        note: null,
+        photo_path: null,
+        created_by: i % 3 === 2 ? "demo-user-2" : "demo-user-1",
+        created_at: at(minutes),
+        updated_at: at(minutes),
+        updated_by: null,
+        deleted_at: null,
+      });
+    });
+  }
+
+  return out;
+}

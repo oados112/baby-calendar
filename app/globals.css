@@ -51,8 +51,8 @@
   --ev-health-soft: #ffe4e6;
   --ev-growth: #7c3aed; /* גדילה — סגול */
   --ev-growth-soft: #ede9fe;
-  --ev-activity: #0369a1; /* פעילות — כחול */
-  --ev-activity-soft: #e0f2fe;
+  --ev-activity: #047857; /* פעילות — ירוק */
+  --ev-activity-soft: #d7f0e6;
   --ev-note: #57534e; /* הערה — אפור */
   --ev-note-soft: #f5f5f4;
 
@@ -113,18 +113,20 @@
   --status-late: #f87171;
   --status-late-soft: #3d1616;
 
-  --ev-feed: #fbbf24;
+  /* הצעדים האלה אומתו מול משטח הרקע הכהה: טווח בהירות, רוויה מינימלית,
+     הפרדה לעיוורון צבעים וניגודיות. הגרסה הקודמת נכשלה בשלוש מהן. */
+  --ev-feed: #c88113;
   --ev-feed-soft: #3a2a0c;
-  --ev-sleep: #a5b4fc;
+  --ev-sleep: #7f83f2;
   --ev-sleep-soft: #24244d;
-  --ev-diaper: #67e8f9;
+  --ev-diaper: #1f93ab;
   --ev-diaper-soft: #0d3b45;
-  --ev-health: #fda4af;
+  --ev-health: #dd5d74;
   --ev-health-soft: #431722;
-  --ev-growth: #c4b5fd;
+  --ev-growth: #b06ef5;
   --ev-growth-soft: #2e2150;
-  --ev-activity: #7dd3fc;
-  --ev-activity-soft: #0c3554;
+  --ev-activity: #2fa56f;
+  --ev-activity-soft: #0d2a1e;
   --ev-note: #d6d3d1;
   --ev-note-soft: #2b2724;
 

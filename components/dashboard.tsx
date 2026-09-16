@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { SinceCard } from "@/components/since-card";
 import { Sheet } from "@/components/sheet";
 import { TimerPanel } from "@/components/timer-panel";
+import { PageNav } from "@/components/page-nav";
 import {
   BottleForm,
   DiaperForm,
@@ -182,6 +183,8 @@ export function Dashboard({
           </div>
         </div>
       </header>
+
+      <PageNav />
 
       <main id="main" className="flex-1 px-4 pb-32">
         <TimerPanel
