@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import Script from "next/script";
 import { Heebo } from "next/font/google";
 import "./globals.css";
 import { THEME_INIT_SCRIPT } from "@/lib/theme";
@@ -36,12 +37,18 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="he" dir="rtl" className={`${heebo.variable} h-full`}>
-      <head>
-        {/* קובע ערכת נושא לפני הציור הראשון כדי למנוע הבזק לבן בלילה */}
-        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
-      </head>
+    <html
+      lang="he"
+      dir="rtl"
+      className={`${heebo.variable} h-full`}
+      /* data-theme נקבע בסקריפט שלמטה לפני ההידרציה */
+      suppressHydrationWarning
+    >
       <body className="min-h-full antialiased">
+        {/* קובע ערכת נושא לפני הציור הראשון כדי למנוע הבזק לבן בלילה */}
+        <Script id="theme-init" strategy="beforeInteractive">
+          {THEME_INIT_SCRIPT}
+        </Script>
         <a href="#main" className="skip-link">
           דילוג לתוכן
         </a>

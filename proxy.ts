@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { isSupabaseConfigured } from "@/lib/config";
 
 /** נתיבים שפתוחים למי שלא מחובר. */
 const PUBLIC_PATHS = ["/login", "/auth/callback", "/invite"];
@@ -8,8 +9,11 @@ function isPublic(pathname: string) {
   return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 }
 
-export async function middleware(request: NextRequest) {
+export default async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
+
+  // מצב תצוגה: כל עוד אין פרויקט Supabase, אין מה לאמת מולו
+  if (!isSupabaseConfigured) return response;
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
