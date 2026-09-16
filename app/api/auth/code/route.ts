@@ -42,11 +42,20 @@ export async function POST(request: NextRequest) {
     .single();
 
   if (redeemError || !redeemed) {
-    const tooMany = redeemError?.message?.includes("too_many_attempts");
-    return NextResponse.json(
-      { error: tooMany ? "too_many_attempts" : "invalid_code" },
-      { status: tooMany ? 429 : 401 },
-    );
+    const message = redeemError?.message ?? "";
+
+    if (message.includes("too_many_attempts")) {
+      return NextResponse.json({ error: "too_many_attempts" }, { status: 429 });
+    }
+    // רק דחייה מפורשת של הקוד היא "קוד שגוי". כל שגיאה אחרת — הרשאות,
+    // חיבור, פונקציה חסרה — חייבת להיראות אחרת, אחרת תקלת תשתית מתחזה
+    // לטעות הקלדה של המשתמש ואי אפשר לאתר אותה.
+    if (!message.includes("invalid_code")) {
+      console.error("redeem_access_code failed:", message);
+      return NextResponse.json({ error: "server_error" }, { status: 500 });
+    }
+
+    return NextResponse.json({ error: "invalid_code" }, { status: 401 });
   }
 
   const { identity_email: email, code_id: codeId } = redeemed as {
