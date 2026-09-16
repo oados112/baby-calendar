@@ -2,9 +2,35 @@
 
 import { useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
-import { SITE_URL } from "@/lib/config";
+import { getSiteOrigin } from "@/lib/config";
 import { Button, TextField } from "@/components/ui";
 import { IconBaby } from "@/components/icons";
+
+/**
+ * תרגום שגיאות Supabase להודעה שאפשר לפעול לפיה.
+ *
+ * באתר ציבורי היינו מסתירים את ההבדל בין "כתובת לא מורשית" ל"תקלה", כדי
+ * לא לאפשר גילוי משתמשים. כאן הרשימה סגורה וידועה לשני ההורים, ולכן
+ * הודעה מדויקת שווה הרבה יותר מהסתרה שלא מגינה על אף אחד.
+ */
+function describeAuthError(message: string, status?: number): string {
+  const m = message.toLowerCase();
+
+  // הטריגר של הרשימה הלבנה דוחה יצירת משתמש
+  if (m.includes("database error saving new user")) {
+    return "הכתובת הזו אינה ברשימת המורשים. בדקו שהקלדתם נכון, או בקשו הזמנה.";
+  }
+  if (m.includes("rate limit") || status === 429) {
+    return "נשלחו יותר מדי בקשות. נסו שוב בעוד כמה דקות.";
+  }
+  if (m.includes("invalid") && m.includes("email")) {
+    return "כתובת המייל אינה תקינה.";
+  }
+  if (m.includes("signups not allowed") || m.includes("disabled")) {
+    return "ההרשמה סגורה כרגע. פנו למנהל היומן.";
+  }
+  return "לא הצלחנו לשלוח את הקישור. נסו שוב בעוד רגע.";
+}
 
 /**
  * התחברות בקישור למייל (Magic Link).
@@ -29,13 +55,12 @@ export function LoginForm({ initialError }: { initialError?: string }) {
     const supabase = getSupabaseBrowserClient();
     const { error } = await supabase.auth.signInWithOtp({
       email: address,
-      options: { emailRedirectTo: `${SITE_URL}/auth/callback` },
+      options: { emailRedirectTo: `${getSiteOrigin()}/auth/callback` },
     });
 
     if (error) {
       setStatus("idle");
-      // לא חושפים אם הכתובת קיימת או לא — הודעה אחידה
-      setError("לא הצלחנו לשלוח את הקישור. בדקו את הכתובת ונסו שוב.");
+      setError(describeAuthError(error.message, error.status));
       return;
     }
 
