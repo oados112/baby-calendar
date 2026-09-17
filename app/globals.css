@@ -318,3 +318,44 @@ body {
 .skip-link:focus {
   top: calc(0.5rem + var(--safe-top));
 }
+
+/* ==========================================================================
+   הדפסה
+   דף שמודפס לרופא צריך להיות הנתונים בלבד: בלי תפריטים, בלי כפתורים,
+   בלי צבעי רקע שמבזבזים דיו, ועם קישורים שאין בהם טעם על נייר.
+   ========================================================================== */
+
+@media print {
+  nav,
+  button,
+  .skip-link,
+  [role="dialog"] {
+    display: none !important;
+  }
+
+  :root {
+    --surface-base: #ffffff;
+    --surface-card: #ffffff;
+    --surface-sunken: #ffffff;
+    --text-strong: #000000;
+    --text-default: #1a1a1a;
+    --text-muted: #444444;
+    --text-faint: #666666;
+    --border-subtle: #cccccc;
+  }
+
+  body {
+    background: #fff;
+  }
+
+  main {
+    max-width: none !important;
+    padding: 0 !important;
+  }
+
+  /* לא לחתוך רישום באמצע בין שני עמודים */
+  li,
+  section {
+    break-inside: avoid;
+  }
+}

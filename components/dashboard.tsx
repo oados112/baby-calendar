@@ -6,6 +6,7 @@ import { Sheet } from "@/components/sheet";
 import { Button } from "@/components/ui";
 import { TimerPanel } from "@/components/timer-panel";
 import { PageNav } from "@/components/page-nav";
+import { SyncBanner } from "@/components/sync-banner";
 import { FormForType } from "@/components/log-forms";
 import {
   IconActivity,
@@ -34,6 +35,7 @@ import {
 } from "@/lib/data/log";
 import { EventList } from "@/components/event-list";
 import { makeTempId, useLiveData } from "@/lib/use-live-data";
+import { enqueue, isNetworkError } from "@/lib/offline-queue";
 import type { ActiveTimerRow, EventRow, EventType } from "@/types/db";
 
 export interface DashboardBaby {
@@ -183,6 +185,16 @@ export function Dashboard({
       logEvent(input, currentUserId ?? "")
         .then(({ id }) => confirm({ ...optimistic, id }))
         .catch((e: unknown) => {
+          if (isNetworkError(e)) {
+            // אין רשת: הרישום נשאר על המסך ונשמר לשליחה מאוחרת.
+            // הסרתו כאן הייתה אומרת להורה שהרישום אבד, והוא לא אבד.
+            enqueue(optimistic.id, input).catch(() => {
+              rollback();
+              setToast("לא הצלחנו לשמור את הרישום");
+            });
+            return;
+          }
+
           rollback();
           setToast(e instanceof Error ? e.message : "השמירה נכשלה");
         });
@@ -313,6 +325,7 @@ export function Dashboard({
       </header>
 
       <PageNav />
+      {demo ? null : <SyncBanner userId={currentUserId ?? ""} />}
 
       <main id="main" className="flex-1 px-4 pb-32">
         <TimerPanel

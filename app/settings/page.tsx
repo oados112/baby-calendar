@@ -2,10 +2,11 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { BabySettings } from "@/components/baby-settings";
 import { FamilySettings, type CodeRow } from "@/components/family-settings";
+import { ExportSettings } from "@/components/export-settings";
 import { NotificationSettings } from "@/components/notification-settings";
 import { PageNav } from "@/components/page-nav";
 import { isSupabaseConfigured } from "@/lib/config";
-import { getFamilyContext } from "@/lib/data/family";
+import { getFamilyContext, getMemberNames } from "@/lib/data/family";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import type { ReminderRuleRow } from "@/types/db";
 
@@ -22,7 +23,7 @@ export default async function SettingsPage() {
   const supabase = await getSupabaseServerClient();
   const isAdmin = context.member.role === "admin";
 
-  const [{ data: rules }, { data: codes }] = await Promise.all([
+  const [{ data: rules }, { data: codes }, memberNames] = await Promise.all([
     supabase
       .from("reminder_rules")
       .select("*")
@@ -32,6 +33,7 @@ export default async function SettingsPage() {
     isAdmin
       ? supabase.rpc("list_access_codes", {})
       : Promise.resolve({ data: [] as CodeRow[] }),
+    getMemberNames(context.member.family_id),
   ]);
 
   return (
@@ -48,6 +50,15 @@ export default async function SettingsPage() {
             userId={context.member.user_id}
             rules={(rules ?? []) as ReminderRuleRow[]}
           />
+
+          {baby ? (
+            <ExportSettings
+              babyId={baby.id}
+              babyName={baby.name?.trim() || "התינוק"}
+              memberNames={memberNames}
+              timeZone={context.timeZone}
+            />
+          ) : null}
 
           {isAdmin ? (
             <FamilySettings
