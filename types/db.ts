@@ -175,6 +175,32 @@ export interface Database {
         Returns: { family_id: string; baby_id: string }[];
       };
       accept_invite: { Args: { p_token: string }; Returns: string };
+      create_access_code: {
+        Args: {
+          p_label: string;
+          p_identity_email: string;
+          p_code: string;
+          p_role?: MemberRole;
+          p_can_see_medical?: boolean;
+        };
+        Returns: string;
+      };
+      list_access_codes: {
+        Args: Record<string, never>;
+        Returns: {
+          id: string;
+          label: string;
+          identity_email: string;
+          role: MemberRole;
+          can_see_medical: boolean;
+          created_at: string;
+          last_used_at: string | null;
+          use_count: number;
+          is_revoked: boolean;
+          has_joined: boolean;
+        }[];
+      };
+      revoke_access_code: { Args: { p_code_id: string }; Returns: void };
       soft_delete_event: { Args: { p_event_id: string }; Returns: void };
       last_events_summary: {
         Args: { p_baby_id: string };
