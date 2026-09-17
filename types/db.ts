@@ -107,6 +107,32 @@ export type ActiveTimerRow = {
   started_by: string;
 }
 
+export type PushSubscriptionRow = {
+  id: string;
+  user_id: string;
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+  user_agent: string | null;
+  created_at: string;
+  last_ok_at: string | null;
+  fail_count: number;
+};
+
+export type ReminderRuleRow = {
+  id: string;
+  family_id: string;
+  baby_id: string | null;
+  target_user_id: string | null;
+  kind: ReminderKind;
+  config: Json;
+  is_enabled: boolean;
+  quiet_from: string | null;
+  quiet_to: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 type TableDef<Row, Insert = Partial<Row>, Update = Partial<Row>> = {
   Row: Row;
   Insert: Insert;
@@ -126,6 +152,12 @@ export interface Database {
           Partial<EventRow>
       >;
       active_timers: TableDef<ActiveTimerRow>;
+      push_subscriptions: TableDef<
+        PushSubscriptionRow,
+        Pick<PushSubscriptionRow, "user_id" | "endpoint" | "p256dh" | "auth"> &
+          Partial<PushSubscriptionRow>
+      >;
+      reminder_rules: TableDef<ReminderRuleRow>;
     };
     Views: { [_ in never]: never };
     Functions: {

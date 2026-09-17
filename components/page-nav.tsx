@@ -14,6 +14,7 @@ const TABS = [
   { href: "/", label: "היום" },
   { href: "/journal", label: "יומן" },
   { href: "/stats", label: "מגמות" },
+  { href: "/settings", label: "הגדרות" },
 ];
 
 export function PageNav() {
