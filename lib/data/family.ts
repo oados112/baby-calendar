@@ -1,4 +1,6 @@
+import { cookies } from "next/headers";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { pickBaby, SELECTED_BABY_COOKIE } from "@/lib/babies";
 import type { ActiveTimerRow, BabyRow, EventRow, FamilyMemberRow } from "@/types/db";
 
 /**
@@ -57,6 +59,12 @@ export async function getFamilyContext(): Promise<FamilyContext | null> {
     babies: babies ?? [],
     timeZone: joined.families?.timezone ?? "Asia/Jerusalem",
   };
+}
+
+/** הילד/ה שנבחר/ה, לפי העוגייה, עם נפילה חזרה לראשון/ה. */
+export async function getSelectedBaby(babies: BabyRow[]): Promise<BabyRow | null> {
+  const store = await cookies();
+  return pickBaby(babies, store.get(SELECTED_BABY_COOKIE)?.value);
 }
 
 /**

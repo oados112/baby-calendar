@@ -7,6 +7,7 @@ import { Button } from "@/components/ui";
 import { TimerPanel } from "@/components/timer-panel";
 import { PageNav } from "@/components/page-nav";
 import { SyncBanner } from "@/components/sync-banner";
+import { BabySwitcher } from "@/components/baby-switcher";
 import { FormForType } from "@/components/log-forms";
 import {
   IconActivity,
@@ -56,6 +57,8 @@ export interface DashboardProps {
   memberNames: Record<string, string>;
   /** אזור הזמן של המשפחה — קובע איפה עובר הגבול בין ימים */
   timeZone: string;
+  /** כל הילדים במשפחה — המחליף מוצג רק כשיש יותר מאחד */
+  siblings?: DashboardBaby[];
   /** האם יש עוד רישומים ישנים מעבר לעמוד הראשון */
   hasMore?: boolean;
   /** מצב תצוגה עם נתוני דוגמה — הכתיבה מושבתת */
@@ -113,6 +116,7 @@ export function Dashboard({
   memberNames,
   currentUserId,
   timeZone,
+  siblings = [],
   hasMore = false,
   demo = false,
 }: DashboardProps) {
@@ -322,6 +326,8 @@ export function Dashboard({
             </p>
           </div>
         </div>
+
+        <BabySwitcher babies={siblings} selectedId={baby.id} />
       </header>
 
       <PageNav />

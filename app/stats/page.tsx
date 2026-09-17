@@ -5,6 +5,7 @@ import { getDemoWeek } from "@/lib/demo-data";
 import {
   getEventsBetween,
   getFamilyContext,
+  getSelectedBaby,
   getGrowthEvents,
 } from "@/lib/data/family";
 import { sleepHeatmap, summarizeDays } from "@/lib/stats";
@@ -32,7 +33,7 @@ export default async function StatsPage() {
 
   const context = await getFamilyContext();
   if (!context) redirect("/onboarding");
-  const baby = context.babies[0];
+  const baby = await getSelectedBaby(context.babies);
   if (!baby) redirect("/onboarding");
 
   const timeZone = context.timeZone;

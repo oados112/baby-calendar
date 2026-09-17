@@ -6,6 +6,7 @@ import {
   getActiveTimers,
   getEventsPage,
   getFamilyContext,
+  getSelectedBaby,
   getMemberNames,
 } from "@/lib/data/family";
 
@@ -27,7 +28,7 @@ export default async function HomePage() {
   const context = await getFamilyContext();
   if (!context) redirect("/onboarding");
 
-  const baby = context.babies[0];
+  const baby = await getSelectedBaby(context.babies);
   if (!baby) redirect("/onboarding");
 
   const PAGE_SIZE = 40;
@@ -49,6 +50,7 @@ export default async function HomePage() {
       memberNames={memberNames}
       currentUserId={context.member.user_id}
       timeZone={context.timeZone}
+      siblings={context.babies}
       hasMore={hasMore}
     />
   );
