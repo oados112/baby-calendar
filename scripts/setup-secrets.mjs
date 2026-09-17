@@ -67,7 +67,9 @@ const instructions = `הסודות של ההתראות
 
 שלב א — Vercel
 ------------------------------------------------------------------
-Settings -> Environment Variables -> Add New, ארבע פעמים.
+Settings -> Environment Variables.
+לכל אחד מהארבעה: אם השם כבר קיים ברשימה -> שלוש נקודות -> Edit
+והחלף את הערך. אם לא קיים -> Add New.
 סמן את שלוש הסביבות (Production / Preview / Development).
 
 NEXT_PUBLIC_VAPID_PUBLIC_KEY
