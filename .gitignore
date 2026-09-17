@@ -34,6 +34,9 @@ yarn-error.log*
 .env*
 !.env.example
 
+# סודות שנכתבים מקומית להעתקה ידנית
+SETUP-SECRETS.txt
+
 # vercel
 .vercel
 
