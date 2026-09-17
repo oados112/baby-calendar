@@ -4,30 +4,62 @@ import { useState } from "react";
 import { useNow } from "@/lib/use-now";
 import { Button } from "@/components/ui";
 import type { LogInput } from "@/lib/data/log";
-import type { EventType } from "@/types/db";
+import type { EventRow, EventType } from "@/types/db";
 
 /**
  * טפסי הרישום.
  *
- * העיקרון בכל טופס: הוא נפתח כשהוא כבר מוכן לשמירה. שעה = עכשיו,
- * וברירות המחדל הן מה שקורה בדרך כלל. מי שרוצה לדייק — מדייק;
- * מי שמחזיק תינוק ביד אחת — לוחץ פעם אחת ונגמר.
+ * שני עקרונות:
+ *
+ *  1. הטופס נפתח כשהוא כבר מוכן לשמירה. השעה היא "עכשיו", וברירות
+ *     המחדל הן מה שקורה בדרך כלל. מי שרוצה לדייק — מדייק; מי שמחזיק
+ *     תינוק ביד אחת — לוחץ פעם אחת ונגמר.
+ *
+ *  2. אותו טופס משמש גם לעריכה. כשמועבר `initial`, השדות נטענים מתוך
+ *     הרישום הקיים — כך שלחיצה בטעות אינה גוזרת רישום שגוי לנצח,
+ *     ואפשר לתקן כמות, סוג או שעה אחר כך.
  */
 
-interface FormProps {
+export interface FormProps {
   babyId: string;
   /**
    * שולח את הרישום. לא מחזיר Promise בכוונה: המסך נסגר והרישום מופיע
-   * מיד, והשמירה בפועל ממשיכה ברקע. אם היא תיכשל, הרישום יוסר והודעה
-   * תוסבר — אבל במקרה הרגיל המשתמש לא מחכה לרשת אפילו שנייה.
+   * מיד, והשמירה בפועל ממשיכה ברקע.
    */
   submit: (input: LogInput) => void;
+  /** רישום קיים לעריכה. null/undefined = רישום חדש */
+  initial?: EventRow | null;
   onDone: () => void;
   /** שגיאת קלט מקומית (לא שגיאת רשת — זו מטופלת ברקע) */
   onError: (message: string) => void;
 }
 
 /* ---------------------------------------------------------------- כלי עזר */
+
+function initialData(initial?: EventRow | null): Record<string, unknown> {
+  return (initial?.data ?? {}) as Record<string, unknown>;
+}
+
+function num(data: Record<string, unknown>, key: string): number | null {
+  return typeof data[key] === "number" ? (data[key] as number) : null;
+}
+
+function str(data: Record<string, unknown>, key: string): string | null {
+  return typeof data[key] === "string" ? (data[key] as string) : null;
+}
+
+function startOf(initial?: EventRow | null): Date {
+  return initial ? new Date(initial.started_at) : new Date();
+}
+
+function minutesToSec(value: string): number {
+  const n = parseFloat(value);
+  return Number.isFinite(n) && n > 0 ? Math.round(n * 60) : 0;
+}
+
+function secToMinutes(seconds: number | null): string {
+  return seconds && seconds > 0 ? String(Math.round(seconds / 60)) : "";
+}
 
 /** בורר זמן: ברירת המחדל "עכשיו", עם קיצורים לאחור למי שרושם בדיעבד. */
 function TimePicker({
@@ -141,22 +173,64 @@ function ChoiceRow<T extends string>({
   );
 }
 
-function SaveButton({ label = "שמירה" }: { label?: string }) {
+/** שדה מספרי עם תווית ויחידה. */
+function NumberField({
+  label,
+  unit,
+  value,
+  onChange,
+  step = "1",
+  placeholder,
+}: {
+  label: string;
+  unit?: string;
+  value: string;
+  onChange: (v: string) => void;
+  step?: string;
+  placeholder?: string;
+}) {
+  return (
+    <label className="flex flex-1 flex-col gap-1.5">
+      <span className="text-[0.8125rem] text-muted">{label}</span>
+      <div className="flex items-center gap-1.5">
+        <input
+          type="number"
+          inputMode="decimal"
+          step={step}
+          min="0"
+          placeholder={placeholder}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="min-h-tap-comfy w-full rounded-md border border-line bg-surface-sunken px-3 text-[1rem] text-strong"
+        />
+        {unit ? (
+          <span className="shrink-0 text-[0.8125rem] text-muted">{unit}</span>
+        ) : null}
+      </div>
+    </label>
+  );
+}
+
+function SaveButton({ editing }: { editing: boolean }) {
   return (
     <Button type="submit" fullWidth className="mt-1">
-      {label}
+      {editing ? "שמירת השינויים" : "שמירה"}
     </Button>
   );
 }
 
 /* ------------------------------------------------------------------ חיתול */
 
-export function DiaperForm({ babyId, submit, onDone }: FormProps) {
-  const [kind, setKind] = useState<"pee" | "poo" | "both" | "dry">("pee");
-  const [color, setColor] = useState<string | null>(null);
-  const [rash, setRash] = useState(false);
-  const [at, setAt] = useState(new Date());
-  const [note, setNote] = useState("");
+export function DiaperForm({ babyId, submit, initial, onDone }: FormProps) {
+  const d = initialData(initial);
+  const initialKind: "pee" | "poo" | "both" | "dry" =
+    d.pee && d.poo ? "both" : d.poo ? "poo" : d.pee ? "pee" : initial ? "dry" : "pee";
+
+  const [kind, setKind] = useState(initialKind);
+  const [color, setColor] = useState<string | null>(str(d, "color"));
+  const [rash, setRash] = useState(Boolean(d.rash));
+  const [at, setAt] = useState(startOf(initial));
+  const [note, setNote] = useState(initial?.note ?? "");
 
   const hasPoo = kind === "poo" || kind === "both";
 
@@ -195,7 +269,7 @@ export function DiaperForm({ babyId, submit, onDone }: FormProps) {
       {hasPoo ? (
         <ChoiceRow
           label="צבע"
-          value={color as string | null}
+          value={color}
           onChange={setColor}
           options={[
             { value: "yellow", label: "צהוב" },
@@ -218,7 +292,7 @@ export function DiaperForm({ babyId, submit, onDone }: FormProps) {
 
       <TimePicker value={at} onChange={setAt} />
       <NoteField value={note} onChange={setNote} />
-      <SaveButton />
+      <SaveButton editing={Boolean(initial)} />
     </form>
   );
 }
@@ -228,13 +302,19 @@ export function DiaperForm({ babyId, submit, onDone }: FormProps) {
 export function BottleForm({
   babyId,
   submit,
+  initial,
   onDone,
   lastAmountMl,
 }: FormProps & { lastAmountMl?: number | null }) {
-  const [amount, setAmount] = useState<number>(lastAmountMl ?? 80);
-  const [kind, setKind] = useState<"formula" | "breast_milk" | "expressed">("formula");
-  const [at, setAt] = useState(new Date());
-  const [note, setNote] = useState("");
+  const d = initialData(initial);
+  const [amount, setAmount] = useState<number>(
+    num(d, "amount_ml") ?? lastAmountMl ?? 80,
+  );
+  const [kind, setKind] = useState<"formula" | "breast_milk" | "expressed">(
+    (str(d, "kind") as "formula" | "breast_milk" | "expressed" | null) ?? "formula",
+  );
+  const [at, setAt] = useState(startOf(initial));
+  const [note, setNote] = useState(initial?.note ?? "");
 
   return (
     <form
@@ -300,17 +380,193 @@ export function BottleForm({
 
       <TimePicker value={at} onChange={setAt} />
       <NoteField value={note} onChange={setNote} />
-      <SaveButton />
+      <SaveButton editing={Boolean(initial)} />
     </form>
   );
 }
 
-/* -------------------------------------------------------------- חום ומשקל */
+/* ----------------------------------------------------------------- שאיבה */
 
-export function TemperatureForm({ babyId, submit, onDone }: FormProps) {
-  const [celsius, setCelsius] = useState(36.8);
-  const [at, setAt] = useState(new Date());
-  const [note, setNote] = useState("");
+/**
+ * שאיבה — כמות ומשך לכל שד בנפרד.
+ *
+ * ההפרדה חשובה בפועל: פער עקבי בין הצדדים הוא מידע אמיתי (סתימת צינורית,
+ * ירידה בייצור בצד אחד), והסכום לבדו מסתיר אותו.
+ */
+export function PumpForm({ babyId, submit, initial, onDone }: FormProps) {
+  const d = initialData(initial);
+  const [leftMl, setLeftMl] = useState(num(d, "left_ml")?.toString() ?? "");
+  const [rightMl, setRightMl] = useState(num(d, "right_ml")?.toString() ?? "");
+  const [leftMin, setLeftMin] = useState(secToMinutes(num(d, "left_sec")));
+  const [rightMin, setRightMin] = useState(secToMinutes(num(d, "right_sec")));
+  const [at, setAt] = useState(startOf(initial));
+  const [note, setNote] = useState(initial?.note ?? "");
+
+  const total = (parseFloat(leftMl) || 0) + (parseFloat(rightMl) || 0);
+
+  return (
+    <form
+      className="flex flex-col gap-4"
+      onSubmit={(e) => {
+        e.preventDefault();
+        const leftSec = minutesToSec(leftMin);
+        const rightSec = minutesToSec(rightMin);
+
+        submit({
+          babyId,
+          type: "pump",
+          startedAt: at,
+          endedAt:
+            leftSec + rightSec > 0
+              ? new Date(at.getTime() + (leftSec + rightSec) * 1000)
+              : null,
+          note,
+          data: {
+            left_ml: parseFloat(leftMl) || 0,
+            right_ml: parseFloat(rightMl) || 0,
+            amount_ml: total,
+            left_sec: leftSec,
+            right_sec: rightSec,
+          },
+        });
+        onDone();
+      }}
+    >
+      <fieldset className="flex flex-col gap-2">
+        <legend className="mb-1 text-[0.875rem] font-medium text-default">
+          כמה נשאב
+        </legend>
+        <div className="flex gap-3">
+          <NumberField
+            label="ימין"
+            unit="מ״ל"
+            value={rightMl}
+            onChange={setRightMl}
+            step="5"
+            placeholder="0"
+          />
+          <NumberField
+            label="שמאל"
+            unit="מ״ל"
+            value={leftMl}
+            onChange={setLeftMl}
+            step="5"
+            placeholder="0"
+          />
+        </div>
+        <p className="text-center text-[0.8125rem] text-muted">
+          סה״כ <span className="tnum font-medium text-strong">{total || 0}</span> מ״ל
+        </p>
+      </fieldset>
+
+      <fieldset className="flex flex-col gap-2">
+        <legend className="mb-1 text-[0.875rem] font-medium text-default">
+          כמה זמן (לא חובה)
+        </legend>
+        <div className="flex gap-3">
+          <NumberField
+            label="ימין"
+            unit="דק׳"
+            value={rightMin}
+            onChange={setRightMin}
+            placeholder="0"
+          />
+          <NumberField
+            label="שמאל"
+            unit="דק׳"
+            value={leftMin}
+            onChange={setLeftMin}
+            placeholder="0"
+          />
+        </div>
+      </fieldset>
+
+      <TimePicker value={at} onChange={setAt} />
+      <NoteField value={note} onChange={setNote} />
+      <SaveButton editing={Boolean(initial)} />
+    </form>
+  );
+}
+
+/* ------------------------------------------------------------------ הנקה */
+
+/** הנקה שנרשמת ידנית או נערכת אחרי טיימר — זמן לכל צד. */
+export function BreastForm({ babyId, submit, initial, onDone }: FormProps) {
+  const d = initialData(initial);
+  const [leftMin, setLeftMin] = useState(secToMinutes(num(d, "left_sec")));
+  const [rightMin, setRightMin] = useState(secToMinutes(num(d, "right_sec")));
+  const [at, setAt] = useState(startOf(initial));
+  const [note, setNote] = useState(initial?.note ?? "");
+
+  const totalMin = (parseFloat(leftMin) || 0) + (parseFloat(rightMin) || 0);
+
+  return (
+    <form
+      className="flex flex-col gap-4"
+      onSubmit={(e) => {
+        e.preventDefault();
+        const leftSec = minutesToSec(leftMin);
+        const rightSec = minutesToSec(rightMin);
+
+        submit({
+          babyId,
+          type: "feed_breast",
+          startedAt: at,
+          endedAt:
+            leftSec + rightSec > 0
+              ? new Date(at.getTime() + (leftSec + rightSec) * 1000)
+              : null,
+          note,
+          data: {
+            left_sec: leftSec,
+            right_sec: rightSec,
+            last_side: str(d, "last_side"),
+          },
+        });
+        onDone();
+      }}
+    >
+      <fieldset className="flex flex-col gap-2">
+        <legend className="mb-1 text-[0.875rem] font-medium text-default">
+          כמה זמן בכל צד
+        </legend>
+        <div className="flex gap-3">
+          <NumberField
+            label="ימין"
+            unit="דק׳"
+            value={rightMin}
+            onChange={setRightMin}
+            placeholder="0"
+          />
+          <NumberField
+            label="שמאל"
+            unit="דק׳"
+            value={leftMin}
+            onChange={setLeftMin}
+            placeholder="0"
+          />
+        </div>
+        {totalMin > 0 ? (
+          <p className="text-center text-[0.8125rem] text-muted">
+            סה״כ <span className="tnum font-medium text-strong">{totalMin}</span> דקות
+          </p>
+        ) : null}
+      </fieldset>
+
+      <TimePicker value={at} onChange={setAt} />
+      <NoteField value={note} onChange={setNote} />
+      <SaveButton editing={Boolean(initial)} />
+    </form>
+  );
+}
+
+/* -------------------------------------------------------------- חום וגדילה */
+
+export function TemperatureForm({ babyId, submit, initial, onDone }: FormProps) {
+  const d = initialData(initial);
+  const [celsius, setCelsius] = useState(num(d, "celsius") ?? 36.8);
+  const [at, setAt] = useState(startOf(initial));
+  const [note, setNote] = useState(initial?.note ?? "");
 
   // ספי ההתייחסות המקובלים לתינוקות
   const status =
@@ -362,16 +618,18 @@ export function TemperatureForm({ babyId, submit, onDone }: FormProps) {
 
       <TimePicker value={at} onChange={setAt} />
       <NoteField value={note} onChange={setNote} />
-      <SaveButton />
+      <SaveButton editing={Boolean(initial)} />
     </form>
   );
 }
 
-export function GrowthForm({ babyId, submit, onDone, onError }: FormProps) {
-  const [weightKg, setWeightKg] = useState("");
-  const [heightCm, setHeightCm] = useState("");
-  const [headCm, setHeadCm] = useState("");
-  const [at, setAt] = useState(new Date());
+export function GrowthForm({ babyId, submit, initial, onDone, onError }: FormProps) {
+  const d = initialData(initial);
+  const weight = num(d, "weight_g");
+  const [weightKg, setWeightKg] = useState(weight ? (weight / 1000).toFixed(3) : "");
+  const [heightCm, setHeightCm] = useState(num(d, "height_cm")?.toString() ?? "");
+  const [headCm, setHeadCm] = useState(num(d, "head_cm")?.toString() ?? "");
+  const [at, setAt] = useState(startOf(initial));
 
   const nothing = !weightKg && !heightCm && !headCm;
 
@@ -397,27 +655,33 @@ export function GrowthForm({ babyId, submit, onDone, onError }: FormProps) {
         onDone();
       }}
     >
-      {[
-        { label: "משקל (ק״ג)", value: weightKg, set: setWeightKg, step: "0.001", ph: "3.150" },
-        { label: "אורך (ס״מ)", value: heightCm, set: setHeightCm, step: "0.1", ph: "50.5" },
-        { label: "היקף ראש (ס״מ)", value: headCm, set: setHeadCm, step: "0.1", ph: "35.0" },
-      ].map((f) => (
-        <label key={f.label} className="flex flex-col gap-1.5">
-          <span className="text-[0.875rem] font-medium text-default">{f.label}</span>
-          <input
-            type="number"
-            inputMode="decimal"
-            step={f.step}
-            placeholder={f.ph}
-            value={f.value}
-            onChange={(e) => f.set(e.target.value)}
-            className="min-h-tap-comfy rounded-md border border-line bg-surface-sunken px-3 text-[1rem] text-strong"
-          />
-        </label>
-      ))}
+      <NumberField
+        label="משקל"
+        unit="ק״ג"
+        step="0.001"
+        placeholder="3.150"
+        value={weightKg}
+        onChange={setWeightKg}
+      />
+      <NumberField
+        label="אורך"
+        unit="ס״מ"
+        step="0.1"
+        placeholder="50.5"
+        value={heightCm}
+        onChange={setHeightCm}
+      />
+      <NumberField
+        label="היקף ראש"
+        unit="ס״מ"
+        step="0.1"
+        placeholder="35.0"
+        value={headCm}
+        onChange={setHeadCm}
+      />
 
       <TimePicker value={at} onChange={setAt} />
-      <SaveButton />
+      <SaveButton editing={Boolean(initial)} />
     </form>
   );
 }
@@ -428,10 +692,11 @@ export function SimpleForm({
   babyId,
   submit,
   type,
+  initial,
   onDone,
 }: FormProps & { type: EventType }) {
-  const [note, setNote] = useState("");
-  const [at, setAt] = useState(new Date());
+  const [note, setNote] = useState(initial?.note ?? "");
+  const [at, setAt] = useState(startOf(initial));
 
   return (
     <form
@@ -444,7 +709,31 @@ export function SimpleForm({
     >
       <NoteField value={note} onChange={setNote} />
       <TimePicker value={at} onChange={setAt} />
-      <SaveButton />
+      <SaveButton editing={Boolean(initial)} />
     </form>
   );
+}
+
+/** בוחר את הטופס המתאים לסוג האירוע. */
+export function FormForType({
+  type,
+  lastAmountMl,
+  ...props
+}: FormProps & { type: EventType; lastAmountMl?: number | null }) {
+  switch (type) {
+    case "diaper":
+      return <DiaperForm {...props} />;
+    case "feed_bottle":
+      return <BottleForm {...props} lastAmountMl={lastAmountMl} />;
+    case "pump":
+      return <PumpForm {...props} />;
+    case "feed_breast":
+      return <BreastForm {...props} />;
+    case "temperature":
+      return <TemperatureForm {...props} />;
+    case "growth":
+      return <GrowthForm {...props} />;
+    default:
+      return <SimpleForm {...props} type={type} />;
+  }
 }

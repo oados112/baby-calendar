@@ -205,6 +205,16 @@ export function summarizeEvent(type: EventType, data: unknown): string | null {
               : null;
       return [ml ? `${ml} מ״ל` : null, kind].filter(Boolean).join(" · ") || null;
     }
+    case "pump": {
+      const l = num("left_ml") ?? 0;
+      const r = num("right_ml") ?? 0;
+      const total = num("amount_ml") ?? l + r;
+      const parts: string[] = [];
+      if (total) parts.push(`${total} מ״ל`);
+      // הפירוט לצדדים מוצג רק כששניהם נרשמו — אחרת הוא רק רעש
+      if (l && r) parts.push(`ימין ${r} · שמאל ${l}`);
+      return parts.join(" · ") || null;
+    }
     case "feed_breast": {
       const l = num("left_sec") ?? 0;
       const r = num("right_sec") ?? 0;

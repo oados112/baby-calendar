@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { EventList } from "@/components/event-list";
-import { deleteEvent } from "@/lib/data/log";
+import { deleteEvent, updateEvent, type LogInput } from "@/lib/data/log";
 import type { EventRow } from "@/types/db";
 
 /**
@@ -14,10 +14,12 @@ import type { EventRow } from "@/types/db";
 export function DayEvents({
   events: initial,
   memberNames,
+  currentUserId,
   emptyLabel,
 }: {
   events: EventRow[];
   memberNames: Record<string, string>;
+  currentUserId: string;
   emptyLabel: string;
 }) {
   const [events, setEvents] = useState(initial);
@@ -40,6 +42,33 @@ export function DayEvents({
     });
   }
 
+  function handleEdit(event: EventRow, input: LogInput) {
+    const patched: EventRow = {
+      ...event,
+      started_at: input.startedAt.toISOString(),
+      ended_at: input.endedAt ? input.endedAt.toISOString() : null,
+      data: (input.data ?? {}) as EventRow["data"],
+      note: input.note?.trim() || null,
+    };
+
+    setEvents((current) => current.map((e) => (e.id === event.id ? patched : e)));
+    setError(null);
+
+    updateEvent(
+      event.id,
+      {
+        startedAt: input.startedAt,
+        endedAt: input.endedAt ?? null,
+        data: input.data ?? {},
+        note: input.note ?? null,
+      },
+      currentUserId,
+    ).catch((e: unknown) => {
+      setEvents((current) => current.map((x) => (x.id === event.id ? event : x)));
+      setError(e instanceof Error ? e.message : "העריכה נכשלה");
+    });
+  }
+
   if (events.length === 0) {
     return (
       <p className="rounded-lg border border-dashed border-line px-4 py-10 text-center text-[0.9375rem] text-muted">
@@ -55,7 +84,12 @@ export function DayEvents({
           {error}
         </p>
       ) : null}
-      <EventList events={events} memberNames={memberNames} onDelete={handleDelete} />
+      <EventList
+        events={events}
+        memberNames={memberNames}
+        onDelete={handleDelete}
+        onEdit={handleEdit}
+      />
     </>
   );
 }

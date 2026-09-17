@@ -34,6 +34,7 @@ export default async function JournalPage({ searchParams }: PageProps<"/journal"
         summary={summarizeDays(events, [key], tz)[0]}
         events={events}
         memberNames={DEMO_MEMBER_NAMES}
+        currentUserId="demo-user-1"
       />
     );
   }
@@ -64,6 +65,7 @@ export default async function JournalPage({ searchParams }: PageProps<"/journal"
       summary={summary}
       events={events}
       memberNames={memberNames}
+      currentUserId={context.member.user_id}
     />
   );
 }

@@ -6,13 +6,7 @@ import { Sheet } from "@/components/sheet";
 import { TimerPanel } from "@/components/timer-panel";
 import { PageNav } from "@/components/page-nav";
 import { ThemeToggle } from "@/components/theme-toggle";
-import {
-  BottleForm,
-  DiaperForm,
-  GrowthForm,
-  SimpleForm,
-  TemperatureForm,
-} from "@/components/log-forms";
+import { FormForType } from "@/components/log-forms";
 import {
   IconActivity,
   IconBaby,
@@ -30,7 +24,13 @@ import {
 import { babyDisplayName, babyInitial, newbornAge } from "@/lib/baby";
 import { EVENT_META, FAMILY_CLASSES, summarizeEvent } from "@/lib/event-meta";
 import { babyAgeHebrew, durationHebrew } from "@/lib/time";
-import { deleteEvent, logEvent, startTimer, type LogInput } from "@/lib/data/log";
+import {
+  deleteEvent,
+  logEvent,
+  startTimer,
+  updateEvent,
+  type LogInput,
+} from "@/lib/data/log";
 import { EventList } from "@/components/event-list";
 import { makeTempId, useLiveData } from "@/lib/use-live-data";
 import type { ActiveTimerRow, EventRow, EventType } from "@/types/db";
@@ -112,6 +112,7 @@ export function Dashboard({
     timers,
     addOptimistic,
     removeOptimistic,
+    patchEvent,
     addTimer,
     patchTimer,
     removeTimer,
@@ -179,6 +180,38 @@ export function Dashboard({
         });
     },
     [addOptimistic, currentUserId, demo],
+  );
+
+  /** עריכת רישום קיים — משתקפת על המסך מיד. */
+  const handleEdit = useCallback(
+    (event: EventRow, input: LogInput) => {
+      if (demo) {
+        setToast("זו תצוגה לדוגמה — העריכה תעבוד אחרי ההתחברות");
+        return;
+      }
+
+      const { rollback } = patchEvent(event.id, {
+        started_at: input.startedAt.toISOString(),
+        ended_at: input.endedAt ? input.endedAt.toISOString() : null,
+        data: (input.data ?? {}) as EventRow["data"],
+        note: input.note?.trim() || null,
+      });
+
+      updateEvent(
+        event.id,
+        {
+          startedAt: input.startedAt,
+          endedAt: input.endedAt ?? null,
+          data: input.data ?? {},
+          note: input.note ?? null,
+        },
+        currentUserId ?? "",
+      ).catch((e: unknown) => {
+        rollback();
+        setToast(e instanceof Error ? e.message : "העריכה נכשלה");
+      });
+    },
+    [currentUserId, demo, patchEvent],
   );
 
   /** מחיקה רכה, עם אפשרות להחזיר. */
@@ -336,6 +369,7 @@ export function Dashboard({
               events={events}
               memberNames={memberNames}
               onDelete={handleDelete}
+              onEdit={handleEdit}
             />
           )}
         </section>
@@ -497,15 +531,7 @@ function LogSheet({
           תצוגה לדוגמה — השמירה מושבתת.
         </p>
       ) : null}
-      {kind === "diaper" ? <DiaperForm {...props} /> : null}
-      {kind === "feed_bottle" ? (
-        <BottleForm {...props} lastAmountMl={lastAmountMl} />
-      ) : null}
-      {kind === "temperature" ? <TemperatureForm {...props} /> : null}
-      {kind === "growth" ? <GrowthForm {...props} /> : null}
-      {!["diaper", "feed_bottle", "temperature", "growth"].includes(kind) ? (
-        <SimpleForm {...props} type={kind} />
-      ) : null}
+      <FormForType {...props} type={kind} lastAmountMl={lastAmountMl} />
     </Sheet>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
-import type { ActiveTimerRow, EventType, Json } from "@/types/db";
+import type { ActiveTimerRow, EventRow, EventType, Json } from "@/types/db";
 
 /**
  * כתיבת רישומים מהדפדפן.
@@ -128,5 +128,37 @@ export async function switchSide(
     .update(patch)
     .eq("id", timerId);
 
+  if (error) throw new Error(error.message);
+}
+
+/**
+ * עריכת רישום קיים.
+ *
+ * שולחים רק את מה שהשתנה. ה-RLS מחליט אם מותר: מנהל עורך הכל, רושם
+ * עורך רק את מה שהוא עצמו רשם ורק בתוך 24 שעות.
+ */
+export interface EventPatch {
+  startedAt?: Date;
+  endedAt?: Date | null;
+  data?: Record<string, unknown>;
+  note?: string | null;
+}
+
+export async function updateEvent(
+  eventId: string,
+  patch: EventPatch,
+  userId: string,
+): Promise<void> {
+  const supabase = getSupabaseBrowserClient();
+
+  const payload: Partial<EventRow> = { updated_by: userId };
+  if (patch.startedAt) payload.started_at = patch.startedAt.toISOString();
+  if (patch.endedAt !== undefined) {
+    payload.ended_at = patch.endedAt ? patch.endedAt.toISOString() : null;
+  }
+  if (patch.data !== undefined) payload.data = patch.data as Json;
+  if (patch.note !== undefined) payload.note = patch.note?.trim() || null;
+
+  const { error } = await supabase.from("events").update(payload).eq("id", eventId);
   if (error) throw new Error(error.message);
 }

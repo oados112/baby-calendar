@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Sheet } from "@/components/sheet";
+import { FormForType } from "@/components/log-forms";
 import { Button } from "@/components/ui";
 import {
   IconActivity,
@@ -19,6 +20,7 @@ import { EVENT_META, FAMILY_CLASSES, summarizeEvent } from "@/lib/event-meta";
 import { durationHebrew, formatClock, relativeHebrew } from "@/lib/time";
 import { isPending } from "@/lib/use-live-data";
 import { useNow } from "@/lib/use-now";
+import type { LogInput } from "@/lib/data/log";
 import type { EventRow, EventType } from "@/types/db";
 
 const ICONS: Partial<
@@ -62,14 +64,23 @@ export function EventList({
   events,
   memberNames,
   onDelete,
+  onEdit,
   canDelete = true,
 }: {
   events: EventRow[];
   memberNames: Record<string, string>;
   onDelete?: (event: EventRow) => void;
+  /** שמירת עריכה. בלעדיו לא מוצג כפתור עריכה. */
+  onEdit?: (event: EventRow, input: LogInput) => void;
   canDelete?: boolean;
 }) {
   const [open, setOpen] = useState<EventRow | null>(null);
+  const [editing, setEditing] = useState(false);
+
+  function close() {
+    setOpen(null);
+    setEditing(false);
+  }
 
   return (
     <>
@@ -84,17 +95,32 @@ export function EventList({
       </ol>
 
       {open ? (
-        <DetailSheet
-          event={open}
-          memberNames={memberNames}
-          canDelete={canDelete && !isPending(open.id)}
-          onClose={() => setOpen(null)}
-          onDelete={() => {
-            const target = open;
-            setOpen(null);
-            onDelete?.(target);
-          }}
-        />
+        editing ? (
+          <Sheet title={`עריכת ${EVENT_META[open.type].label}`} onClose={close}>
+            <FormForType
+              type={open.type}
+              babyId={open.baby_id}
+              initial={open}
+              submit={(input) => onEdit?.(open, input)}
+              onDone={close}
+              onError={() => {}}
+            />
+          </Sheet>
+        ) : (
+          <DetailSheet
+            event={open}
+            memberNames={memberNames}
+            canDelete={canDelete && !isPending(open.id)}
+            canEdit={Boolean(onEdit) && !isPending(open.id)}
+            onClose={close}
+            onEdit={() => setEditing(true)}
+            onDelete={() => {
+              const target = open;
+              close();
+              onDelete?.(target);
+            }}
+          />
+        )
       ) : null}
     </>
   );
@@ -180,13 +206,17 @@ function DetailSheet({
   event,
   memberNames,
   canDelete,
+  canEdit,
   onClose,
+  onEdit,
   onDelete,
 }: {
   event: EventRow;
   memberNames: Record<string, string>;
   canDelete: boolean;
+  canEdit: boolean;
   onClose: () => void;
+  onEdit: () => void;
   onDelete: () => void;
 }) {
   const [confirming, setConfirming] = useState(false);
@@ -232,8 +262,14 @@ function DetailSheet({
         </p>
       ) : null}
 
+      {canEdit ? (
+        <Button variant="primary" fullWidth className="mt-5" onClick={onEdit}>
+          עריכה
+        </Button>
+      ) : null}
+
       {canDelete ? (
-        <div className="mt-5">
+        <div className="mt-2">
           {confirming ? (
             <div className="flex flex-col gap-2">
               <p className="text-center text-[0.875rem] text-muted">

@@ -19,12 +19,14 @@ export function DayView({
   summary,
   events,
   memberNames,
+  currentUserId,
 }: {
   dayKey: string;
   todayKey: string;
   summary: DaySummary;
   events: EventRow[];
   memberNames: Record<string, string>;
+  currentUserId: string;
 }) {
   const prev = shiftDayKey(dayKey, -1);
   const next = shiftDayKey(dayKey, 1);
@@ -114,6 +116,7 @@ export function DayView({
           <DayEvents
             events={events}
             memberNames={memberNames}
+            currentUserId={currentUserId}
             emptyLabel={isFuture ? "היום עוד לא התחיל." : "לא נרשם דבר ביום הזה."}
           />
         </section>
