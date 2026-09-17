@@ -1,7 +1,9 @@
 import { PageNav } from "@/components/page-nav";
+import { GrowthPanel } from "@/components/growth-panel";
 import { BarChart, SleepHeatmap, StatTile, type BarDatum } from "@/components/charts";
 import { averageOf, formatHours, type DaySummary } from "@/lib/stats";
 import { shortDate, weekdayShort } from "@/lib/zoned";
+import type { EventRow } from "@/types/db";
 
 /**
  * תצוגה שבועית.
@@ -14,10 +16,15 @@ export function WeekView({
   days,
   heatmap,
   todayKey,
+  growth,
+  birthWeightG,
 }: {
   days: DaySummary[];
   heatmap: number[][];
   todayKey: string;
+  /** מדידות גדילה לכל הזמנים */
+  growth: EventRow[];
+  birthWeightG: number | null;
 }) {
   const labels = days.map((d) => weekdayShort(d.key));
 
@@ -130,6 +137,8 @@ export function WeekView({
             </Panel>
           </>
         )}
+
+        <GrowthPanel events={growth} birthWeightG={birthWeightG} />
       </main>
     </div>
   );

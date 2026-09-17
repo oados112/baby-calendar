@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useNow } from "@/lib/use-now";
 import { Button } from "@/components/ui";
+import { checkDose, findMedicine, MEDICINES } from "@/lib/medicines";
+import { durationHebrew } from "@/lib/time";
 import type { LogInput } from "@/lib/data/log";
 import type { EventRow, EventType } from "@/types/db";
 
@@ -32,6 +34,8 @@ export interface FormProps {
   onDone: () => void;
   /** שגיאת קלט מקומית (לא שגיאת רשת — זו מטופלת ברקע) */
   onError: (message: string) => void;
+  /** רישומים אחרונים — משמשים לבדיקת מרווח בין מנות תרופה */
+  recentEvents?: { type: string; started_at: string; data: unknown }[];
 }
 
 /* ---------------------------------------------------------------- כלי עזר */
@@ -686,6 +690,188 @@ export function GrowthForm({ babyId, submit, initial, onDone, onError }: FormPro
   );
 }
 
+/* ----------------------------------------------------------------- תרופה */
+
+/**
+ * רישום תרופה או תוסף.
+ *
+ * הערך המרכזי כאן הוא לא הרישום אלא **האזהרה**: הורה עייף, בשתיים
+ * בלילה, אחרי שבן/בת הזוג כבר נתן/ה מנה — זה בדיוק המצב שבו ניתנת מנה
+ * כפולה. המסך אומר מתי ניתנה המנה האחרונה ומתי מותר את הבאה.
+ *
+ * האתר אינו מחשב מינון ואינו מציע מינון. מינון לתינוק נקבע לפי משקל
+ * ובהוראת רופא; כאן רק רושמים מה שכבר ניתן.
+ */
+export function MedicineForm({
+  babyId,
+  submit,
+  initial,
+  onDone,
+  onError,
+  recentEvents = [],
+}: FormProps) {
+  const d = initialData(initial);
+  const [medicineId, setMedicineId] = useState(
+    str(d, "medicine_id") ?? MEDICINES[0].id,
+  );
+  const [customName, setCustomName] = useState(
+    str(d, "medicine_id") === "other" ? (str(d, "name") ?? "") : "",
+  );
+  const [dose, setDose] = useState(
+    num(d, "dose") !== null ? String(num(d, "dose")) : "",
+  );
+  const medicine = findMedicine(medicineId);
+  const [unit, setUnit] = useState(str(d, "unit") ?? medicine.units[0]);
+  const [at, setAt] = useState(startOf(initial));
+  const [note, setNote] = useState(initial?.note ?? "");
+
+  const now = useNow();
+  const check = now
+    ? checkDose({
+        medicineId,
+        // בעריכה לא בודקים מול הרישום של עצמו
+        events: recentEvents.filter((e) => e.started_at !== initial?.started_at),
+        now,
+        minHours: medicine.minHours,
+        maxPerDay: medicine.maxPerDay,
+      })
+    : null;
+
+  return (
+    <form
+      className="flex flex-col gap-4"
+      onSubmit={(e) => {
+        e.preventDefault();
+        const name = medicineId === "other" ? customName.trim() : medicine.label;
+        if (!name) {
+          onError("צריך למלא שם תרופה");
+          return;
+        }
+
+        submit({
+          babyId,
+          type: "medicine",
+          startedAt: at,
+          note,
+          data: {
+            medicine_id: medicineId,
+            name,
+            dose: dose ? parseFloat(dose) : null,
+            unit,
+          },
+        });
+        onDone();
+      }}
+    >
+      <fieldset className="flex flex-col gap-2">
+        <legend className="mb-1 text-[0.875rem] font-medium text-default">מה ניתן</legend>
+        <div className="grid grid-cols-2 gap-1.5">
+          {MEDICINES.map((m) => (
+            <button
+              key={m.id}
+              type="button"
+              aria-pressed={m.id === medicineId}
+              onClick={() => {
+                setMedicineId(m.id);
+                setUnit(m.units[0]);
+              }}
+              className={[
+                "min-h-tap rounded-md border px-3 text-[0.875rem] transition-colors duration-150",
+                m.id === medicineId
+                  ? "border-accent bg-accent-soft font-medium text-accent-text"
+                  : "border-line bg-surface-card text-default",
+              ].join(" ")}
+            >
+              {m.label}
+            </button>
+          ))}
+        </div>
+      </fieldset>
+
+      {medicineId === "other" ? (
+        <label className="flex flex-col gap-1.5">
+          <span className="text-[0.8125rem] text-muted">שם התרופה</span>
+          <input
+            value={customName}
+            onChange={(e) => setCustomName(e.target.value)}
+            className="min-h-tap-comfy rounded-md border border-line bg-surface-sunken px-3 text-[1rem] text-strong"
+          />
+        </label>
+      ) : null}
+
+      {check && check.lastGivenAt ? (
+        <div
+          role="status"
+          className={[
+            "rounded-md px-3 py-2.5 text-[0.8125rem] leading-relaxed",
+            check.ok && !check.overDailyLimit
+              ? "bg-ok-soft text-ok"
+              : "bg-late-soft text-late",
+          ].join(" ")}
+        >
+          {!check.ok ? (
+            <>
+              המנה האחרונה ניתנה לפני{" "}
+              {durationHebrew(
+                (now!.getTime() - new Date(check.lastGivenAt).getTime()) / 1000,
+              )}
+              . לפי המרווח המקובל אפשר לתת שוב בעוד{" "}
+              {durationHebrew(check.minutesRemaining * 60)}.
+            </>
+          ) : check.overDailyLimit ? (
+            <>
+              כבר ניתנו {check.dosesToday} מנות ביממה האחרונה
+              {medicine.maxPerDay ? ` (המקובל: עד ${medicine.maxPerDay})` : ""}.
+            </>
+          ) : (
+            <>
+              המנה האחרונה ניתנה לפני{" "}
+              {durationHebrew(
+                (now!.getTime() - new Date(check.lastGivenAt).getTime()) / 1000,
+              )}
+              . אפשר לתת.
+            </>
+          )}
+        </div>
+      ) : null}
+
+      <div className="flex gap-3">
+        <NumberField
+          label="מינון"
+          value={dose}
+          onChange={setDose}
+          step="0.1"
+          placeholder="0"
+        />
+        <label className="flex flex-1 flex-col gap-1.5">
+          <span className="text-[0.8125rem] text-muted">יחידה</span>
+          <select
+            value={unit}
+            onChange={(e) => setUnit(e.target.value)}
+            className="min-h-tap-comfy rounded-md border border-line bg-surface-sunken px-3 text-[1rem] text-strong"
+          >
+            {medicine.units.map((u) => (
+              <option key={u} value={u}>
+                {u}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      {medicine.note ? (
+        <p className="text-[0.75rem] leading-relaxed text-faint">
+          {medicine.note}. המינון נקבע לפי משקל ובהוראת רופא — האתר רק רושם.
+        </p>
+      ) : null}
+
+      <TimePicker value={at} onChange={setAt} />
+      <NoteField value={note} onChange={setNote} />
+      <SaveButton editing={Boolean(initial)} />
+    </form>
+  );
+}
+
 /* ------------------------------------------------------- הערה ופעילות כללית */
 
 export function SimpleForm({
@@ -733,6 +919,8 @@ export function FormForType({
       return <TemperatureForm {...props} />;
     case "growth":
       return <GrowthForm {...props} />;
+    case "medicine":
+      return <MedicineForm {...props} />;
     default:
       return <SimpleForm {...props} type={type} />;
   }

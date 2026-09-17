@@ -2,7 +2,11 @@ import { redirect } from "next/navigation";
 import { WeekView } from "@/components/week-view";
 import { isSupabaseConfigured } from "@/lib/config";
 import { getDemoWeek } from "@/lib/demo-data";
-import { getEventsBetween, getFamilyContext } from "@/lib/data/family";
+import {
+  getEventsBetween,
+  getFamilyContext,
+  getGrowthEvents,
+} from "@/lib/data/family";
 import { sleepHeatmap, summarizeDays } from "@/lib/stats";
 import { dayKey as toDayKey, dayRange, lastDayKeys } from "@/lib/zoned";
 
@@ -20,6 +24,8 @@ export default async function StatsPage() {
         days={summarizeDays(events, keys, tz)}
         heatmap={sleepHeatmap(events, keys, tz)}
         todayKey={today}
+        growth={[]}
+        birthWeightG={2795}
       />
     );
   }
@@ -36,14 +42,22 @@ export default async function StatsPage() {
   // מושכים יום נוסף אחורה: שינה שהתחילה אתמול בלילה שייכת גם לשעות של היום
   const { from } = dayRange(keys[0], timeZone);
   const { to } = dayRange(todayKey, timeZone);
-  const events = await getEventsBetween(
-    baby.id,
-    new Date(from.getTime() - 12 * 3600_000),
-    to,
-  );
+  const [events, growth] = await Promise.all([
+    getEventsBetween(baby.id, new Date(from.getTime() - 12 * 3600_000), to),
+    // מדידות גדילה נשלפות לכל הזמנים, לא רק לשבוע האחרון
+    getGrowthEvents(baby.id),
+  ]);
 
   const days = summarizeDays(events, keys, timeZone);
   const heatmap = sleepHeatmap(events, keys, timeZone);
 
-  return <WeekView days={days} heatmap={heatmap} todayKey={todayKey} />;
+  return (
+    <WeekView
+      days={days}
+      heatmap={heatmap}
+      todayKey={todayKey}
+      growth={growth}
+      birthWeightG={baby.birth_weight_g}
+    />
+  );
 }

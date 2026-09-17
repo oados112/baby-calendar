@@ -442,6 +442,7 @@ export function Dashboard({
           lastAmountMl={
             (lastBottle?.data as { amount_ml?: number } | null)?.amount_ml ?? null
           }
+          recentEvents={events}
           demo={demo}
           submit={submit}
           onPick={(type) => setSheet(type)}
@@ -472,6 +473,7 @@ function LogSheet({
   kind,
   babyId,
   lastAmountMl,
+  recentEvents,
   demo,
   submit,
   onPick,
@@ -483,6 +485,8 @@ function LogSheet({
   kind: EventType | "more" | "breast_start";
   babyId: string;
   lastAmountMl: number | null;
+  /** לבדיקת מרווח בין מנות תרופה */
+  recentEvents: EventRow[];
   demo: boolean;
   submit: (input: LogInput) => void;
   onPick: (type: EventType) => void;
@@ -541,7 +545,7 @@ function LogSheet({
   }
 
   const meta = EVENT_META[kind];
-  const props = { babyId, submit, onDone, onError };
+  const props = { babyId, submit, onDone, onError, recentEvents };
 
   return (
     <Sheet title={`רישום ${meta.label}`} onClose={onClose}>

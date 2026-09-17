@@ -119,6 +119,7 @@ export function EventList({
               type={open.type}
               babyId={open.baby_id}
               initial={open}
+              recentEvents={events}
               submit={(input) => onEdit?.(open, input)}
               onDone={close}
               onError={() => {}}

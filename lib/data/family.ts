@@ -123,3 +123,17 @@ export async function getEventsBetween(
 
   return data ?? [];
 }
+
+/** כל מדידות הגדילה, מהישן לחדש — מעט שורות גם אחרי שנים. */
+export async function getGrowthEvents(babyId: string): Promise<EventRow[]> {
+  const supabase = await getSupabaseServerClient();
+  const { data } = await supabase
+    .from("events")
+    .select("*")
+    .eq("baby_id", babyId)
+    .eq("type", "growth")
+    .is("deleted_at", null)
+    .order("started_at", { ascending: true });
+
+  return data ?? [];
+}
