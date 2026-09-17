@@ -21,6 +21,7 @@ import { durationHebrew, formatClock, relativeHebrew } from "@/lib/time";
 import { isPending } from "@/lib/use-live-data";
 import { useNow } from "@/lib/use-now";
 import type { LogInput } from "@/lib/data/log";
+import { dayKey, longDate, shiftDayKey } from "@/lib/zoned";
 import type { EventRow, EventType } from "@/types/db";
 
 const ICONS: Partial<
@@ -66,6 +67,7 @@ export function EventList({
   onDelete,
   onEdit,
   canDelete = true,
+  timeZone,
 }: {
   events: EventRow[];
   memberNames: Record<string, string>;
@@ -73,6 +75,8 @@ export function EventList({
   /** שמירת עריכה. בלעדיו לא מוצג כפתור עריכה. */
   onEdit?: (event: EventRow, input: LogInput) => void;
   canDelete?: boolean;
+  /** מקבץ לפי ימים עם כותרת תאריך. דורש אזור זמן. */
+  timeZone?: string;
 }) {
   const [open, setOpen] = useState<EventRow | null>(null);
   const [editing, setEditing] = useState(false);
@@ -84,15 +88,29 @@ export function EventList({
 
   return (
     <>
-      <ol className="relative space-y-0.5">
-        <span
-          aria-hidden
-          className="absolute top-3 bottom-3 end-[1.375rem] w-px bg-subtle"
+      {timeZone ? (
+        <DayGroups
+          events={events}
+          timeZone={timeZone}
+          memberNames={memberNames}
+          onOpen={setOpen}
         />
-        {events.map((event) => (
-          <Row key={event.id} event={event} memberNames={memberNames} onOpen={setOpen} />
-        ))}
-      </ol>
+      ) : (
+        <ol className="relative space-y-0.5">
+          <span
+            aria-hidden
+            className="absolute top-3 bottom-3 end-[1.375rem] w-px bg-subtle"
+          />
+          {events.map((event) => (
+            <Row
+              key={event.id}
+              event={event}
+              memberNames={memberNames}
+              onOpen={setOpen}
+            />
+          ))}
+        </ol>
+      )}
 
       {open ? (
         editing ? (
@@ -123,6 +141,73 @@ export function EventList({
         )
       ) : null}
     </>
+  );
+}
+
+/** כותרת יום אנושית: "היום" / "אתמול" / "יום רביעי, 16 בספטמבר". */
+function dayHeading(key: string, todayKey: string): string {
+  if (key === todayKey) return "היום";
+  if (key === shiftDayKey(todayKey, -1)) return "אתמול";
+  return longDate(key);
+}
+
+/**
+ * מקבץ את הרישומים לימים.
+ *
+ * הגבול בין ימים נקבע לפי אזור הזמן של המשפחה ולא לפי UTC — אחרת האכלה
+ * ב-01:30 הייתה מופיעה תחת היום הקודם.
+ */
+function DayGroups({
+  events,
+  timeZone,
+  memberNames,
+  onOpen,
+}: {
+  events: EventRow[];
+  timeZone: string;
+  memberNames: Record<string, string>;
+  onOpen: (e: EventRow) => void;
+}) {
+  const now = useNow();
+  // עד שהשעון של הדפדפן זמין, היום הראשון ברשימה משמש כעוגן
+  const todayKey = now
+    ? dayKey(now, timeZone)
+    : events[0]
+      ? dayKey(new Date(events[0].started_at), timeZone)
+      : "";
+
+  const groups: { key: string; items: EventRow[] }[] = [];
+  for (const event of events) {
+    const key = dayKey(new Date(event.started_at), timeZone);
+    const last = groups[groups.length - 1];
+    if (last && last.key === key) last.items.push(event);
+    else groups.push({ key, items: [event] });
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      {groups.map((group) => (
+        <section key={group.key}>
+          <h3 className="mb-1 text-[0.75rem] font-medium text-faint">
+            {dayHeading(group.key, todayKey)}
+          </h3>
+          <ol className="relative space-y-0.5">
+            <span
+              aria-hidden
+              className="absolute top-3 bottom-3 end-[1.375rem] w-px bg-subtle"
+            />
+            {group.items.map((event) => (
+              <Row
+                key={event.id}
+                event={event}
+                memberNames={memberNames}
+                onOpen={onOpen}
+              />
+            ))}
+          </ol>
+        </section>
+      ))}
+    </div>
   );
 }
 

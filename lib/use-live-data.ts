@@ -44,6 +44,8 @@ export interface LiveData {
   removeOptimistic: (id: string) => { restore: () => void };
   /** מחיל עריכה על המסך מיד; rollback מחזיר את הערכים הקודמים */
   patchEvent: (id: string, patch: Partial<EventRow>) => { rollback: () => void };
+  /** מוסיף עמוד של רישומים ישנים יותר לסוף הרשימה */
+  appendEvents: (older: EventRow[]) => void;
   /** מציג טיימר מיד; מחזיר פונקציות לאישור או לביטול */
   addTimer: (timer: ActiveTimerRow) => {
     confirm: (real: ActiveTimerRow) => void;
@@ -134,6 +136,13 @@ export function useLiveData({
           before ? sortDesc(current.map((e) => (e.id === id ? before! : e))) : current,
         ),
     };
+  }, []);
+
+  const appendEvents = useCallback((older: EventRow[]) => {
+    setEvents((current) => {
+      const seen = new Set(current.map((e) => e.id));
+      return sortDesc([...current, ...older.filter((e) => !seen.has(e.id))]);
+    });
   }, []);
 
   const addTimer = useCallback((timer: ActiveTimerRow) => {
@@ -251,6 +260,7 @@ export function useLiveData({
     addOptimistic,
     removeOptimistic,
     patchEvent,
+    appendEvents,
     addTimer,
     patchTimer,
     removeTimer,

@@ -162,3 +162,29 @@ export async function updateEvent(
   const { error } = await supabase.from("events").update(payload).eq("id", eventId);
   if (error) throw new Error(error.message);
 }
+
+/**
+ * עמוד נוסף של רישומים ישנים יותר, לגלילה אחורה.
+ *
+ * דפדוף לפי זמן ולא לפי offset: רישום חדש שנוסף באמצע הגלילה לא יגרום
+ * לשורה להופיע פעמיים או להיעלם.
+ */
+export async function fetchOlderEvents(
+  babyId: string,
+  before: string,
+  limit = 40,
+): Promise<EventRow[]> {
+  const supabase = getSupabaseBrowserClient();
+
+  const { data, error } = await supabase
+    .from("events")
+    .select("*")
+    .eq("baby_id", babyId)
+    .is("deleted_at", null)
+    .lt("started_at", before)
+    .order("started_at", { ascending: false })
+    .limit(limit);
+
+  if (error) throw new Error(error.message);
+  return data ?? [];
+}

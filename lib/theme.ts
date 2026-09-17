@@ -1,57 +1,24 @@
 /**
- * ניהול ערכות נושא.
+ * ערכת הנושא.
  *
- * שלוש ערכות: light / dark / night.
- * "night" היא מסך שחור אמיתי בגוונים חמים — לשימוש בהאכלות לילה.
+ * האתר קבוע על ערכת יום בהירה, בלי בורר ובלי מעבר אוטומטי. זו החלטה
+ * מכוונת: ערכה אחת שנראית אותו דבר בכל מכשיר ובכל שעה היא צפויה, ואין
+ * מה "להיתקע" עליו כשמשתמשים בה בשלוש לפנות בוקר.
  *
- * העדפת המשתמש: auto (ברירת מחדל) | light | dark | night
- * ב-auto: שעות הלילה → night, אחרת לפי העדפת המערכת.
+ * הטוקנים של ערכות ערב ולילה נשארו מוגדרים ב-globals.css תחת
+ * [data-theme="dark"] ו-[data-theme="night"]. הם אינם בשימוש כרגע, אבל
+ * הם מאומתים מבחינת ניגודיות ונגישות — כך שהחזרת האפשרות בעתיד היא
+ * שינוי של שורה אחת כאן, ולא בנייה מחדש.
  */
 
-export type ThemeName = "light" | "dark" | "night";
-export type ThemePreference = "auto" | ThemeName;
+export type ThemeName = "light";
 
-export const THEME_STORAGE_KEY = "bc:theme";
-
-/** שעת התחלה וסיום של מצב לילה אוטומטי (שעון מקומי). */
-export const NIGHT_START_HOUR = 22;
-export const NIGHT_END_HOUR = 6;
-
-export function isNightHour(date: Date = new Date()): boolean {
-  const h = date.getHours();
-  return h >= NIGHT_START_HOUR || h < NIGHT_END_HOUR;
-}
-
-export function resolveTheme(
-  preference: ThemePreference,
-  opts: { prefersDark: boolean; isNight: boolean },
-): ThemeName {
-  if (preference !== "auto") return preference;
-  if (opts.isNight) return "night";
-  return opts.prefersDark ? "dark" : "light";
-}
+export const THEME: ThemeName = "light";
 
 /**
- * סקריפט שרץ ב-<head> לפני הציור הראשון.
- * חייב להיות עצמאי — הוא מוזרק כמחרוזת ולא עובר bundling.
+ * נקבע ב-<head> לפני הציור הראשון.
+ * מוזרק כמחרוזת ולא עובר bundling, ולכן חייב להיות עצמאי.
  */
 export const THEME_INIT_SCRIPT = `
-(function () {
-  try {
-    var pref = localStorage.getItem(${JSON.stringify(THEME_STORAGE_KEY)}) || "auto";
-    var theme = pref;
-    if (pref === "auto") {
-      var h = new Date().getHours();
-      var night = h >= ${NIGHT_START_HOUR} || h < ${NIGHT_END_HOUR};
-      if (night) {
-        theme = "night";
-      } else {
-        theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-      }
-    }
-    document.documentElement.setAttribute("data-theme", theme);
-  } catch (e) {
-    document.documentElement.setAttribute("data-theme", "light");
-  }
-})();
+document.documentElement.setAttribute("data-theme", "light");
 `.trim();

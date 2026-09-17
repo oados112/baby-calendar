@@ -59,21 +59,25 @@ export async function getFamilyContext(): Promise<FamilyContext | null> {
   };
 }
 
-/** אירועי היממה האחרונה של תינוק, החדש ביותר קודם. */
-export async function getRecentEvents(
+/**
+ * העמוד הראשון של יומן הרישומים, החדש ביותר קודם.
+ *
+ * ללא חלון זמן: היומן הוא רצף מתמשך שאפשר לגלול בו אחורה, והדפדוף
+ * בהמשך נעשה מהלקוח לפי חותמת הזמן של הרישום האחרון שהוצג.
+ */
+export async function getEventsPage(
   babyId: string,
-  hours = 24,
+  limit = 41,
 ): Promise<EventRow[]> {
   const supabase = await getSupabaseServerClient();
-  const since = new Date(Date.now() - hours * 3600_000).toISOString();
 
   const { data } = await supabase
     .from("events")
     .select("*")
     .eq("baby_id", babyId)
     .is("deleted_at", null)
-    .gte("started_at", since)
-    .order("started_at", { ascending: false });
+    .order("started_at", { ascending: false })
+    .limit(limit);
 
   return data ?? [];
 }

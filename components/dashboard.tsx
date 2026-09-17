@@ -3,9 +3,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SinceCard } from "@/components/since-card";
 import { Sheet } from "@/components/sheet";
+import { Button } from "@/components/ui";
 import { TimerPanel } from "@/components/timer-panel";
 import { PageNav } from "@/components/page-nav";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { FormForType } from "@/components/log-forms";
 import {
   IconActivity,
@@ -26,6 +26,7 @@ import { EVENT_META, FAMILY_CLASSES, summarizeEvent } from "@/lib/event-meta";
 import { babyAgeHebrew, durationHebrew } from "@/lib/time";
 import {
   deleteEvent,
+  fetchOlderEvents,
   logEvent,
   startTimer,
   updateEvent,
@@ -51,6 +52,10 @@ export interface DashboardProps {
   currentUserId?: string;
   /** שם להצגה לכל user_id, כדי לתייג "מי רשם" */
   memberNames: Record<string, string>;
+  /** אזור הזמן של המשפחה — קובע איפה עובר הגבול בין ימים */
+  timeZone: string;
+  /** האם יש עוד רישומים ישנים מעבר לעמוד הראשון */
+  hasMore?: boolean;
   /** מצב תצוגה עם נתוני דוגמה — הכתיבה מושבתת */
   demo?: boolean;
 }
@@ -105,6 +110,8 @@ export function Dashboard({
   timers: initialTimers,
   memberNames,
   currentUserId,
+  timeZone,
+  hasMore = false,
   demo = false,
 }: DashboardProps) {
   const {
@@ -113,6 +120,7 @@ export function Dashboard({
     addOptimistic,
     removeOptimistic,
     patchEvent,
+    appendEvents,
     addTimer,
     patchTimer,
     removeTimer,
@@ -180,6 +188,12 @@ export function Dashboard({
         });
     },
     [addOptimistic, currentUserId, demo],
+  );
+
+  /** מוסיף לרשימה עמוד של רישומים ישנים יותר. */
+  const appendOlder = useCallback(
+    (older: EventRow[]) => appendEvents(older),
+    [appendEvents],
   );
 
   /** עריכת רישום קיים — משתקפת על המסך מיד. */
@@ -296,8 +310,6 @@ export function Dashboard({
             </p>
           </div>
         </div>
-
-        <ThemeToggle />
       </header>
 
       <PageNav />
@@ -350,27 +362,34 @@ export function Dashboard({
           />
         </section>
 
-        <section aria-label="היום" className="mt-7">
-          <div className="mb-2.5 flex items-baseline justify-between">
-            <h2 className="text-[0.9375rem] font-semibold text-strong">היום</h2>
-            <span className="text-[0.8125rem] text-muted">
-              {events.length} רישומים
-            </span>
-          </div>
+        <section aria-label="רישומים" className="mt-7">
+          <h2 className="mb-2.5 text-[0.9375rem] font-semibold text-strong">
+            הרישומים
+          </h2>
 
           {events.length === 0 ? (
             <p className="rounded-lg border border-dashed border-line px-4 py-8 text-center text-[0.9375rem] leading-relaxed text-muted">
-              עדיין אין רישומים היום.
+              עדיין אין רישומים.
               <br />
               הכפתורים למטה מתחילים.
             </p>
           ) : (
-            <EventList
-              events={events}
-              memberNames={memberNames}
-              onDelete={handleDelete}
-              onEdit={handleEdit}
-            />
+            <>
+              <EventList
+                events={events}
+                memberNames={memberNames}
+                timeZone={timeZone}
+                onDelete={handleDelete}
+                onEdit={handleEdit}
+              />
+              <LoadMore
+                babyId={baby.id}
+                oldest={events[events.length - 1]?.started_at}
+                hasMore={hasMore}
+                onLoaded={appendOlder}
+                onError={setToast}
+              />
+            </>
           )}
         </section>
       </main>
@@ -567,6 +586,83 @@ function QuickButton({
       </span>
       <span className="text-[0.6875rem] font-medium text-muted">{label}</span>
     </button>
+  );
+}
+
+/**
+ * טעינת רישומים ישנים יותר.
+ *
+ * נטענים כשמגיעים לתחתית, ולא הכל מראש: אחרי חצי שנה של רישומים אלה
+ * אלפי שורות, ואין סיבה להוריד אותן כדי לראות את אתמול. יש גם כפתור
+ * מפורש — גלילה אוטומטית לבדה אינה נגישה למקלדת.
+ */
+function LoadMore({
+  babyId,
+  oldest,
+  hasMore,
+  onLoaded,
+  onError,
+}: {
+  babyId: string;
+  /** הרישום הישן ביותר שכבר מוצג — נקודת ההתחלה לעמוד הבא */
+  oldest?: string;
+  hasMore: boolean;
+  onLoaded: (events: EventRow[]) => void;
+  onError: (message: string) => void;
+}) {
+  const [exhausted, setExhausted] = useState(!hasMore);
+  const [loading, setLoading] = useState(false);
+  const sentinel = useRef<HTMLDivElement>(null);
+  const busy = useRef(false);
+
+  const load = useCallback(async () => {
+    if (busy.current || exhausted || !oldest) return;
+    busy.current = true;
+    setLoading(true);
+
+    try {
+      const older = await fetchOlderEvents(babyId, oldest);
+      if (older.length === 0) setExhausted(true);
+      else onLoaded(older);
+    } catch (e) {
+      onError(e instanceof Error ? e.message : "טעינת הרישומים נכשלה");
+      setExhausted(true);
+    } finally {
+      busy.current = false;
+      setLoading(false);
+    }
+  }, [babyId, exhausted, oldest, onError, onLoaded]);
+
+  useEffect(() => {
+    const node = sentinel.current;
+    if (!node || exhausted) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) load();
+      },
+      // מתחילים לטעון קצת לפני הסוף, כדי שהגלילה לא תיעצר
+      { rootMargin: "400px" },
+    );
+
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [exhausted, load]);
+
+  if (exhausted) {
+    return (
+      <p className="py-6 text-center text-[0.75rem] text-faint">
+        זו ההתחלה של היומן
+      </p>
+    );
+  }
+
+  return (
+    <div ref={sentinel} className="py-4">
+      <Button variant="secondary" fullWidth loading={loading} onClick={load}>
+        {loading ? "טוען…" : "רישומים ישנים יותר"}
+      </Button>
+    </div>
   );
 }
 
