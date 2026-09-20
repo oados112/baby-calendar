@@ -218,6 +218,31 @@ function NumberField({
   );
 }
 
+/**
+ * תמונה בטופס.
+ *
+ * הוק ולא העתקה בכל טופס: כל סוג רישום יכול לשאת תמונה, כולל חיתול
+ * (תיעוד פריחה הוא בדיוק מה שרופא מבקש לראות) וכולל בעריכה של רישום
+ * קיים. בלי זה היה צריך לחזור על אותו state בשמונה מקומות.
+ */
+function usePhoto(initial: EventRow | null | undefined, familyId: string, babyId: string) {
+  const [photoPath, setPhotoPath] = useState<string | null>(
+    initial?.photo_path ?? null,
+  );
+
+  return {
+    photoPath,
+    field: (
+      <PhotoField
+        familyId={familyId}
+        babyId={babyId}
+        value={photoPath}
+        onChange={setPhotoPath}
+      />
+    ),
+  };
+}
+
 function SaveButton({ editing }: { editing: boolean }) {
   return (
     <Button type="submit" fullWidth className="mt-1">
@@ -228,7 +253,7 @@ function SaveButton({ editing }: { editing: boolean }) {
 
 /* ------------------------------------------------------------------ חיתול */
 
-export function DiaperForm({ babyId, submit, initial, onDone }: FormProps) {
+export function DiaperForm({ babyId, familyId, submit, initial, onDone }: FormProps) {
   const d = initialData(initial);
   const initialKind: "pee" | "poo" | "both" | "dry" =
     d.pee && d.poo ? "both" : d.poo ? "poo" : d.pee ? "pee" : initial ? "dry" : "pee";
@@ -240,6 +265,8 @@ export function DiaperForm({ babyId, submit, initial, onDone }: FormProps) {
   const [note, setNote] = useState(initial?.note ?? "");
 
   const hasPoo = kind === "poo" || kind === "both";
+
+  const photo = usePhoto(initial, familyId, babyId);
 
   return (
     <form
@@ -257,6 +284,7 @@ export function DiaperForm({ babyId, submit, initial, onDone }: FormProps) {
             color: hasPoo ? color : null,
             rash,
           },
+          photoPath: photo.photoPath
         });
         onDone();
       }}
@@ -299,6 +327,7 @@ export function DiaperForm({ babyId, submit, initial, onDone }: FormProps) {
 
       <TimePicker value={at} onChange={setAt} />
       <NoteField value={note} onChange={setNote} />
+      {photo.field}
       <SaveButton editing={Boolean(initial)} />
     </form>
   );
@@ -308,6 +337,7 @@ export function DiaperForm({ babyId, submit, initial, onDone }: FormProps) {
 
 export function BottleForm({
   babyId,
+  familyId,
   submit,
   initial,
   onDone,
@@ -322,6 +352,7 @@ export function BottleForm({
   );
   const [at, setAt] = useState(startOf(initial));
   const [note, setNote] = useState(initial?.note ?? "");
+  const photo = usePhoto(initial, familyId, babyId);
 
   return (
     <form
@@ -334,6 +365,7 @@ export function BottleForm({
           startedAt: at,
           note,
           data: { amount_ml: amount, kind },
+          photoPath: photo.photoPath
         });
         onDone();
       }}
@@ -387,6 +419,7 @@ export function BottleForm({
 
       <TimePicker value={at} onChange={setAt} />
       <NoteField value={note} onChange={setNote} />
+      {photo.field}
       <SaveButton editing={Boolean(initial)} />
     </form>
   );
@@ -400,7 +433,7 @@ export function BottleForm({
  * ההפרדה חשובה בפועל: פער עקבי בין הצדדים הוא מידע אמיתי (סתימת צינורית,
  * ירידה בייצור בצד אחד), והסכום לבדו מסתיר אותו.
  */
-export function PumpForm({ babyId, submit, initial, onDone }: FormProps) {
+export function PumpForm({ babyId, familyId, submit, initial, onDone }: FormProps) {
   const d = initialData(initial);
   const [leftMl, setLeftMl] = useState(num(d, "left_ml")?.toString() ?? "");
   const [rightMl, setRightMl] = useState(num(d, "right_ml")?.toString() ?? "");
@@ -410,6 +443,8 @@ export function PumpForm({ babyId, submit, initial, onDone }: FormProps) {
   const [note, setNote] = useState(initial?.note ?? "");
 
   const total = (parseFloat(leftMl) || 0) + (parseFloat(rightMl) || 0);
+
+  const photo = usePhoto(initial, familyId, babyId);
 
   return (
     <form
@@ -435,6 +470,7 @@ export function PumpForm({ babyId, submit, initial, onDone }: FormProps) {
             left_sec: leftSec,
             right_sec: rightSec,
           },
+          photoPath: photo.photoPath
         });
         onDone();
       }}
@@ -490,6 +526,7 @@ export function PumpForm({ babyId, submit, initial, onDone }: FormProps) {
 
       <TimePicker value={at} onChange={setAt} />
       <NoteField value={note} onChange={setNote} />
+      {photo.field}
       <SaveButton editing={Boolean(initial)} />
     </form>
   );
@@ -498,7 +535,7 @@ export function PumpForm({ babyId, submit, initial, onDone }: FormProps) {
 /* ------------------------------------------------------------------ הנקה */
 
 /** הנקה שנרשמת ידנית או נערכת אחרי טיימר — זמן לכל צד. */
-export function BreastForm({ babyId, submit, initial, onDone }: FormProps) {
+export function BreastForm({ babyId, familyId, submit, initial, onDone }: FormProps) {
   const d = initialData(initial);
   const [leftMin, setLeftMin] = useState(secToMinutes(num(d, "left_sec")));
   const [rightMin, setRightMin] = useState(secToMinutes(num(d, "right_sec")));
@@ -506,6 +543,8 @@ export function BreastForm({ babyId, submit, initial, onDone }: FormProps) {
   const [note, setNote] = useState(initial?.note ?? "");
 
   const totalMin = (parseFloat(leftMin) || 0) + (parseFloat(rightMin) || 0);
+
+  const photo = usePhoto(initial, familyId, babyId);
 
   return (
     <form
@@ -529,6 +568,7 @@ export function BreastForm({ babyId, submit, initial, onDone }: FormProps) {
             right_sec: rightSec,
             last_side: str(d, "last_side"),
           },
+          photoPath: photo.photoPath
         });
         onDone();
       }}
@@ -562,6 +602,7 @@ export function BreastForm({ babyId, submit, initial, onDone }: FormProps) {
 
       <TimePicker value={at} onChange={setAt} />
       <NoteField value={note} onChange={setNote} />
+      {photo.field}
       <SaveButton editing={Boolean(initial)} />
     </form>
   );
@@ -569,7 +610,7 @@ export function BreastForm({ babyId, submit, initial, onDone }: FormProps) {
 
 /* -------------------------------------------------------------- חום וגדילה */
 
-export function TemperatureForm({ babyId, submit, initial, onDone }: FormProps) {
+export function TemperatureForm({ babyId, familyId, submit, initial, onDone }: FormProps) {
   const d = initialData(initial);
   const [celsius, setCelsius] = useState(num(d, "celsius") ?? 36.8);
   const [at, setAt] = useState(startOf(initial));
@@ -580,6 +621,8 @@ export function TemperatureForm({ babyId, submit, initial, onDone }: FormProps) 
     celsius >= 38 ? "חום" : celsius >= 37.5 ? "חום קל" : celsius < 36 ? "נמוך" : "תקין";
   const statusClass =
     celsius >= 38 ? "text-late" : celsius >= 37.5 ? "text-due" : "text-ok";
+
+  const photo = usePhoto(initial, familyId, babyId);
 
   return (
     <form
@@ -592,6 +635,7 @@ export function TemperatureForm({ babyId, submit, initial, onDone }: FormProps) 
           startedAt: at,
           note,
           data: { celsius },
+          photoPath: photo.photoPath
         });
         onDone();
       }}
@@ -625,12 +669,13 @@ export function TemperatureForm({ babyId, submit, initial, onDone }: FormProps) 
 
       <TimePicker value={at} onChange={setAt} />
       <NoteField value={note} onChange={setNote} />
+      {photo.field}
       <SaveButton editing={Boolean(initial)} />
     </form>
   );
 }
 
-export function GrowthForm({ babyId, submit, initial, onDone, onError }: FormProps) {
+export function GrowthForm({ babyId, familyId, submit, initial, onDone, onError }: FormProps) {
   const d = initialData(initial);
   const weight = num(d, "weight_g");
   const [weightKg, setWeightKg] = useState(weight ? (weight / 1000).toFixed(3) : "");
@@ -639,6 +684,8 @@ export function GrowthForm({ babyId, submit, initial, onDone, onError }: FormPro
   const [at, setAt] = useState(startOf(initial));
 
   const nothing = !weightKg && !heightCm && !headCm;
+
+  const photo = usePhoto(initial, familyId, babyId);
 
   return (
     <form
@@ -658,6 +705,7 @@ export function GrowthForm({ babyId, submit, initial, onDone, onError }: FormPro
             height_cm: heightCm ? parseFloat(heightCm) : null,
             head_cm: headCm ? parseFloat(headCm) : null,
           },
+          photoPath: photo.photoPath
         });
         onDone();
       }}
@@ -688,6 +736,7 @@ export function GrowthForm({ babyId, submit, initial, onDone, onError }: FormPro
       />
 
       <TimePicker value={at} onChange={setAt} />
+      {photo.field}
       <SaveButton editing={Boolean(initial)} />
     </form>
   );
@@ -707,6 +756,7 @@ export function GrowthForm({ babyId, submit, initial, onDone, onError }: FormPro
  */
 export function MedicineForm({
   babyId,
+  familyId,
   submit,
   initial,
   onDone,
@@ -740,6 +790,8 @@ export function MedicineForm({
       })
     : null;
 
+  const photo = usePhoto(initial, familyId, babyId);
+
   return (
     <form
       className="flex flex-col gap-4"
@@ -762,6 +814,7 @@ export function MedicineForm({
             dose: dose ? parseFloat(dose) : null,
             unit,
           },
+          photoPath: photo.photoPath
         });
         onDone();
       }}
@@ -870,6 +923,7 @@ export function MedicineForm({
 
       <TimePicker value={at} onChange={setAt} />
       <NoteField value={note} onChange={setNote} />
+      {photo.field}
       <SaveButton editing={Boolean(initial)} />
     </form>
   );
@@ -887,33 +941,21 @@ export function SimpleForm({
 }: FormProps & { type: EventType }) {
   const [note, setNote] = useState(initial?.note ?? "");
   const [at, setAt] = useState(startOf(initial));
-  const [photoPath, setPhotoPath] = useState<string | null>(
-    initial?.photo_path ?? null,
-  );
-
-  // תמונה רלוונטית לרגעים, לא לספירות. חיתול לא צריך תמונה.
-  const allowsPhoto =
-    type === "note" || type === "milestone" || type === "activity";
+  const photo = usePhoto(initial, familyId, babyId);
 
   return (
     <form
       className="flex flex-col gap-4"
       onSubmit={(e) => {
         e.preventDefault();
-        submit({ babyId, type, startedAt: at, note, photoPath });
+        submit({ babyId, type, startedAt: at, note, photoPath: photo.photoPath });
         onDone();
       }}
     >
       <NoteField value={note} onChange={setNote} />
-      {allowsPhoto ? (
-        <PhotoField
-          familyId={familyId}
-          babyId={babyId}
-          value={photoPath}
-          onChange={setPhotoPath}
-        />
-      ) : null}
+      {photo.field}
       <TimePicker value={at} onChange={setAt} />
+      {photo.field}
       <SaveButton editing={Boolean(initial)} />
     </form>
   );

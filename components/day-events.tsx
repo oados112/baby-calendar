@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { EventList } from "@/components/event-list";
 import { deleteEvent, updateEvent, type LogInput } from "@/lib/data/log";
+import { deletePhotoQuietly } from "@/lib/photos";
 import type { EventRow } from "@/types/db";
 
 /**
@@ -52,7 +53,11 @@ export function DayEvents({
     setError(null);
 
     deleteEvent(event.id)
-      .then(() => router.refresh())
+      .then(() => {
+        // התמונה נמחקת יחד עם הרישום
+        if (event.photo_path) deletePhotoQuietly(event.photo_path);
+        router.refresh();
+      })
       .catch((e: unknown) => {
         // נכשל — מחזירים את השורה למקומה כדי שהמסך לא ישקר
         forget(event.id);

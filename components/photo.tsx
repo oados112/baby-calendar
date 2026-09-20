@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getPhotoUrl, uploadPhoto } from "@/lib/photos";
+import { CameraSheet } from "@/components/camera-sheet";
+import { getPhotoUrl, uploadBlob, uploadPhoto } from "@/lib/photos";
 
 /**
  * תמונות בממשק.
@@ -82,8 +83,9 @@ export function Photo({
 /**
  * בחירת תמונה בטופס.
  *
- * ההעלאה מתחילה מיד עם הבחירה ולא בשמירה — כך המשתמש רואה את התמונה
- * ומקבל שגיאה מוקדם, ולא אחרי שהוא כבר חשב שסיים.
+ * שתי דרכים: צילום בתוך האתר (לא נשמר בגלריה) או בחירה מהמכשיר.
+ * ההעלאה מתחילה מיד עם הבחירה ולא בשמירה — כך רואים את התמונה ומקבלים
+ * שגיאה מוקדם, ולא אחרי שכבר נדמה שסיימנו.
  */
 export function PhotoField({
   familyId,
@@ -97,15 +99,16 @@ export function PhotoField({
   onChange: (path: string | null) => void;
 }) {
   const [busy, setBusy] = useState(false);
+  const [camera, setCamera] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const supportsCamera =
+    typeof navigator !== "undefined" && Boolean(navigator.mediaDevices?.getUserMedia);
 
-  async function pick(file: File | undefined) {
-    if (!file) return;
+  async function run(work: () => Promise<string>) {
     setBusy(true);
     setError(null);
-
     try {
-      onChange(await uploadPhoto(file, familyId, babyId));
+      onChange(await work());
     } catch (e) {
       setError(e instanceof Error ? e.message : "ההעלאה נכשלה");
     } finally {
@@ -129,29 +132,55 @@ export function PhotoField({
           </button>
         </div>
       ) : (
-        <label
-          className={[
-            "flex min-h-tap-comfy cursor-pointer items-center justify-center gap-2",
-            "rounded-md border border-dashed border-line bg-surface-card",
-            "text-[0.875rem] text-muted",
-            busy ? "opacity-60" : "",
-          ].join(" ")}
-        >
-          <input
-            type="file"
-            accept="image/*"
-            className="sr-only"
-            disabled={busy}
-            onChange={(e) => pick(e.target.files?.[0])}
-          />
-          {busy ? "מעלה…" : "בחירת תמונה"}
-        </label>
+        <div className="flex gap-2">
+          {supportsCamera ? (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => setCamera(true)}
+              className="flex min-h-tap-comfy flex-1 items-center justify-center rounded-md border border-line bg-surface-card text-[0.875rem] text-default disabled:opacity-60"
+            >
+              {busy ? "מעלה…" : "צילום"}
+            </button>
+          ) : null}
+
+          <label
+            className={[
+              "flex min-h-tap-comfy flex-1 cursor-pointer items-center justify-center",
+              "rounded-md border border-dashed border-line bg-surface-card",
+              "text-[0.875rem] text-muted",
+              busy ? "opacity-60" : "",
+            ].join(" ")}
+          >
+            <input
+              type="file"
+              accept="image/*"
+              className="sr-only"
+              disabled={busy}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) run(() => uploadPhoto(file, familyId, babyId));
+              }}
+            />
+            מהמכשיר
+          </label>
+        </div>
       )}
 
       {error ? (
         <p role="alert" className="text-[0.8125rem] text-late">
           {error}
         </p>
+      ) : null}
+
+      {camera ? (
+        <CameraSheet
+          onClose={() => setCamera(false)}
+          onCapture={(blob) => {
+            setCamera(false);
+            run(() => uploadBlob(blob, familyId, babyId));
+          }}
+        />
       ) : null}
     </div>
   );

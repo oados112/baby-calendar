@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Sheet } from "@/components/sheet";
 import { FormForType } from "@/components/log-forms";
 import { Photo } from "@/components/photo";
+import { deletePhotoQuietly } from "@/lib/photos";
 import { Button } from "@/components/ui";
 import {
   IconActivity,
@@ -125,7 +126,13 @@ export function EventList({
               familyId={familyId}
               initial={open}
               recentEvents={events}
-              submit={(input) => onEdit?.(open, input)}
+              submit={(input) => {
+                // הוחלפה או הוסרה תמונה — הקובץ הישן כבר לא מקושר לכלום
+                if (open.photo_path && input.photoPath !== open.photo_path) {
+                  deletePhotoQuietly(open.photo_path);
+                }
+                onEdit?.(open, input);
+              }}
               onDone={close}
               onError={() => {}}
             />

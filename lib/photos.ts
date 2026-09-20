@@ -57,16 +57,14 @@ function extensionFor(blob: Blob): string {
   return "jpg";
 }
 
-/** מעלה ומחזיר את הנתיב שנשמר על האירוע. */
-export async function uploadPhoto(
-  file: File,
+/** מעלה בלוב מוכן (למשל פריים מהמצלמה) ומחזיר את הנתיב. */
+export async function uploadBlob(
+  blob: Blob,
   familyId: string,
   babyId: string,
 ): Promise<string> {
-  const blob = await compressImage(file);
-
   if (blob.size > 5 * 1024 * 1024) {
-    throw new Error("התמונה גדולה מדי גם אחרי דחיסה");
+    throw new Error("התמונה גדולה מדי");
   }
 
   // התיקייה הראשונה היא המשפחה — עליה נשענות ההרשאות בצד השרת
@@ -81,6 +79,48 @@ export async function uploadPhoto(
 
   if (error) throw new Error(error.message);
   return path;
+}
+
+/** מקטין פריים גולמי מהמצלמה לאותן מידות כמו תמונה שנבחרה מהמכשיר. */
+export async function frameToBlob(
+  source: CanvasImageSource,
+  width: number,
+  height: number,
+): Promise<Blob> {
+  const scale = Math.min(1, MAX_EDGE / Math.max(width, height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(width * scale);
+  canvas.height = Math.round(height * scale);
+
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("הדפדפן לא תומך בצילום");
+
+  context.drawImage(source, 0, 0, canvas.width, canvas.height);
+
+  const blob = await new Promise<Blob | null>((resolve) =>
+    canvas.toBlob(resolve, "image/webp", QUALITY),
+  );
+
+  if (!blob) throw new Error("הצילום נכשל");
+  return blob;
+}
+
+/** מעלה ומחזיר את הנתיב שנשמר על האירוע. */
+export async function uploadPhoto(
+  file: File,
+  familyId: string,
+  babyId: string,
+): Promise<string> {
+  return uploadBlob(await compressImage(file), familyId, babyId);
+}
+
+/** מחיקה שלא מפילה כלום אם היא נכשלה — משמשת בניקוי אחרי מחיקת רישום. */
+export async function deletePhotoQuietly(path: string): Promise<void> {
+  try {
+    await deletePhoto(path);
+  } catch {
+    // אין טעם להכשיל מחיקת רישום בגלל קובץ שנשאר מאחור
+  }
 }
 
 /**

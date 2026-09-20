@@ -37,6 +37,7 @@ import {
 import { EventList } from "@/components/event-list";
 import { makeTempId, useLiveData } from "@/lib/use-live-data";
 import { enqueue, isNetworkError } from "@/lib/offline-queue";
+import { deletePhotoQuietly } from "@/lib/photos";
 import type { ActiveTimerRow, EventRow, EventType } from "@/types/db";
 
 export interface DashboardBaby {
@@ -259,6 +260,11 @@ export function Dashboard({
 
       deleteEvent(event.id)
         .then(() => {
+          // התמונה נמחקת עם הרישום — אין טעם להשאיר קובץ שאף אחד לא
+          // יגיע אליו, ולא נכון להחזיק תמונה של תינוק אחרי מחיקה.
+          // "ביטול" משחזר את הרישום בלי התמונה.
+          if (event.photo_path) deletePhotoQuietly(event.photo_path);
+
           setUndo({
             message: `${EVENT_META[event.type].label} נמחק`,
             // "ביטול" רושם מחדש את אותם נתונים — הרישום המקורי נשאר מחוק
