@@ -340,8 +340,8 @@ export function BottleForm({
         <div className="flex items-center gap-3">
           <button
             type="button"
-            aria-label="פחות 10 מיליליטר"
-            onClick={() => setAmount((a) => Math.max(5, a - 10))}
+            aria-label="פחות 5 מיליליטר"
+            onClick={() => setAmount((a) => Math.max(5, a - 5))}
             className="min-h-tap-comfy w-14 rounded-md border border-line bg-surface-card text-xl text-default"
           >
             −
@@ -352,8 +352,8 @@ export function BottleForm({
           </div>
           <button
             type="button"
-            aria-label="עוד 10 מיליליטר"
-            onClick={() => setAmount((a) => Math.min(400, a + 10))}
+            aria-label="עוד 5 מיליליטר"
+            onClick={() => setAmount((a) => Math.min(400, a + 5))}
             className="min-h-tap-comfy w-14 rounded-md border border-line bg-surface-card text-xl text-default"
           >
             +

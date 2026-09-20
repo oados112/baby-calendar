@@ -201,6 +201,10 @@ export interface Database {
         }[];
       };
       revoke_access_code: { Args: { p_code_id: string }; Returns: void };
+      get_home_snapshot: {
+        Args: { p_baby_id?: string | null; p_limit?: number };
+        Returns: Json;
+      };
       soft_delete_event: { Args: { p_event_id: string }; Returns: void };
       last_events_summary: {
         Args: { p_baby_id: string };

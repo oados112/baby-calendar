@@ -145,3 +145,61 @@ export async function getGrowthEvents(babyId: string): Promise<EventRow[]> {
 
   return data ?? [];
 }
+
+/**
+ * כל מה שמסך הבית צריך, בפנייה אחת לשרת.
+ *
+ * מחזיר null אם הפונקציה עדיין לא קיימת במסד — כך האתר ממשיך לעבוד
+ * בדיוק כמו קודם עד שהמיגרציה תורץ, בלי מסך שבור באמצע.
+ */
+export interface HomeSnapshot {
+  member: FamilyMemberRow;
+  timeZone: string;
+  babies: BabyRow[];
+  babyId: string | null;
+  events: EventRow[];
+  timers: ActiveTimerRow[];
+  memberNames: Record<string, string>;
+}
+
+export async function getHomeSnapshot(
+  selectedBabyId: string | null,
+  limit: number,
+): Promise<HomeSnapshot | null> {
+  const supabase = await getSupabaseServerClient();
+
+  const { data, error } = await supabase.rpc("get_home_snapshot", {
+    p_baby_id: selectedBabyId,
+    p_limit: limit,
+  });
+
+  if (error || !data) return null;
+
+  const snapshot = data as {
+    member: FamilyMemberRow | null;
+    timezone?: string;
+    babies?: BabyRow[];
+    baby_id?: string | null;
+    events?: EventRow[];
+    timers?: ActiveTimerRow[];
+    members?: Record<string, string>;
+  };
+
+  if (!snapshot.member) return null;
+
+  return {
+    member: snapshot.member,
+    timeZone: snapshot.timezone ?? "Asia/Jerusalem",
+    babies: snapshot.babies ?? [],
+    babyId: snapshot.baby_id ?? null,
+    events: snapshot.events ?? [],
+    timers: snapshot.timers ?? [],
+    memberNames: snapshot.members ?? {},
+  };
+}
+
+/** מזהה הילד/ה שנבחר/ה בעוגייה, בלי לשלוף את הרשימה מהמסד. */
+export async function getSelectedBabyId(): Promise<string | null> {
+  const store = await cookies();
+  return store.get(SELECTED_BABY_COOKIE)?.value ?? null;
+}

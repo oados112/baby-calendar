@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { EventList } from "@/components/event-list";
 import { deleteEvent, updateEvent, type LogInput } from "@/lib/data/log";
 import type { EventRow } from "@/types/db";
@@ -8,11 +9,16 @@ import type { EventRow } from "@/types/db";
 /**
  * רשימת היום ביומן.
  *
- * עוטף את EventList במצב מקומי כדי שמחיקה תיעלם מהמסך מיד, בלי לחכות
- * לשרת ובלי לבנות את הדף מחדש.
+ * הרשימה **נגזרת מה-props ולא מועתקת ל-state**. זה קריטי: מעבר בין ימים
+ * הוא ניווט בתוך אותו עמוד, הרכיב נשאר מחובר, ו-useState(initial) היה
+ * נשאר תקוע על היום הראשון שנטען. זה בדיוק הבאג שגרם לכך שסיכום היום
+ * התעדכן אבל הרשימה מתחתיו לא.
+ *
+ * מה שכן נשמר מקומית הוא רק ההבדל מהשרת — מה שנמחק ומה שנערך זה עתה —
+ * כדי שהפעולה תיראה מיד. ברגע שהשרת מתעדכן, ההבדל הזה פשוט מתאפס.
  */
 export function DayEvents({
-  events: initial,
+  events: fromServer,
   memberNames,
   currentUserId,
   emptyLabel,
@@ -22,36 +28,47 @@ export function DayEvents({
   currentUserId: string;
   emptyLabel: string;
 }) {
-  const [events, setEvents] = useState(initial);
+  const router = useRouter();
+  const [removed, setRemoved] = useState<Set<string>>(() => new Set());
+  const [edited, setEdited] = useState<Record<string, EventRow>>({});
   const [error, setError] = useState<string | null>(null);
 
-  function handleDelete(event: EventRow) {
-    setEvents((current) => current.filter((e) => e.id !== event.id));
-    setError(null);
+  const events = fromServer
+    .map((e) => edited[e.id] ?? e)
+    .filter((e) => !removed.has(e.id));
 
-    deleteEvent(event.id).catch((e: unknown) => {
-      // נכשל — מחזירים את השורה למקומה כדי שהמסך לא ישקר
-      setEvents((current) =>
-        current.some((x) => x.id === event.id)
-          ? current
-          : [event, ...current].sort((a, b) =>
-              b.started_at.localeCompare(a.started_at),
-            ),
-      );
-      setError(e instanceof Error ? e.message : "המחיקה נכשלה");
+  function forget(id: string) {
+    setRemoved((current) => {
+      const next = new Set(current);
+      next.delete(id);
+      return next;
     });
   }
 
-  function handleEdit(event: EventRow, input: LogInput) {
-    const patched: EventRow = {
-      ...event,
-      started_at: input.startedAt.toISOString(),
-      ended_at: input.endedAt ? input.endedAt.toISOString() : null,
-      data: (input.data ?? {}) as EventRow["data"],
-      note: input.note?.trim() || null,
-    };
+  function handleDelete(event: EventRow) {
+    setRemoved((current) => new Set(current).add(event.id));
+    setError(null);
 
-    setEvents((current) => current.map((e) => (e.id === event.id ? patched : e)));
+    deleteEvent(event.id)
+      .then(() => router.refresh())
+      .catch((e: unknown) => {
+        // נכשל — מחזירים את השורה למקומה כדי שהמסך לא ישקר
+        forget(event.id);
+        setError(e instanceof Error ? e.message : "המחיקה נכשלה");
+      });
+  }
+
+  function handleEdit(event: EventRow, input: LogInput) {
+    setEdited((current) => ({
+      ...current,
+      [event.id]: {
+        ...event,
+        started_at: input.startedAt.toISOString(),
+        ended_at: input.endedAt ? input.endedAt.toISOString() : null,
+        data: (input.data ?? {}) as EventRow["data"],
+        note: input.note?.trim() || null,
+      },
+    }));
     setError(null);
 
     updateEvent(
@@ -63,10 +80,16 @@ export function DayEvents({
         note: input.note ?? null,
       },
       currentUserId,
-    ).catch((e: unknown) => {
-      setEvents((current) => current.map((x) => (x.id === event.id ? event : x)));
-      setError(e instanceof Error ? e.message : "העריכה נכשלה");
-    });
+    )
+      .then(() => router.refresh())
+      .catch((e: unknown) => {
+        setEdited((current) => {
+          const next = { ...current };
+          delete next[event.id];
+          return next;
+        });
+        setError(e instanceof Error ? e.message : "העריכה נכשלה");
+      });
   }
 
   if (events.length === 0) {
