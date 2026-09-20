@@ -98,9 +98,15 @@ export function FamilySettings({
                   ) : null}
                 </div>
                 <p className="mt-0.5 text-[0.75rem] text-faint">
+                  {/*
+                    זה תאריך השימוש האחרון *בקוד*, לא פעילות אחרונה באתר.
+                    הסשן נשאר פתוח חודשים, ולכן מי שמשתמש כל יום עדיין
+                    יראה כאן תאריך ישן. הניסוח הקודם ("נכנס לאחרונה")
+                    רמז על פעילות והיה מטעה.
+                  */}
                   {code.last_used_at && now
-                    ? `נכנס לאחרונה ${relativeHebrew(code.last_used_at, now)}`
-                    : "עדיין לא נכנס"}
+                    ? `הזין את הקוד ${relativeHebrew(code.last_used_at, now)}`
+                    : "עדיין לא השתמש/ה בקוד"}
                 </p>
               </div>
 

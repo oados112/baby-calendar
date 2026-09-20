@@ -43,6 +43,8 @@ export function DayView({
         {/* RTL: "אחורה בזמן" הוא החץ שמצביע ימינה */}
         <Link
           href={`/journal?date=${prev}`}
+          // טעינה מראש: היום הקודם מוכן ברקע עוד לפני הלחיצה
+          prefetch
           aria-label="היום הקודם"
           className="grid size-11 shrink-0 place-items-center rounded-md border border-subtle bg-surface-card text-default"
         >
@@ -70,6 +72,7 @@ export function DayView({
         ) : (
           <Link
             href={`/journal?date=${next}`}
+            prefetch
             aria-label="היום הבא"
             className="grid size-11 shrink-0 place-items-center rounded-md border border-subtle bg-surface-card text-default"
           >

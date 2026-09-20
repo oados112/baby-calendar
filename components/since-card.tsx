@@ -17,6 +17,8 @@ export interface SinceCardProps {
   lateAfterHours?: number;
   /** שורת פירוט קצרה: "120 מ״ל" */
   detail?: string | null;
+  /** מחליף את המספר בטקסט קבוע, למשל כשטיימר רץ כרגע */
+  overrideText?: string;
   onClick?: () => void;
 }
 
@@ -66,6 +68,7 @@ export function SinceCard({
   dueAfterHours,
   lateAfterHours,
   detail,
+  overrideText,
   onClick,
 }: SinceCardProps) {
   const now = useNow();
@@ -91,7 +94,11 @@ export function SinceCard({
         onClick ? "transition-transform duration-150 active:scale-[0.97]" : "",
       ].join(" ")}
       aria-label={
-        lastAt && now ? `${title}, ${relativeHebrew(lastAt, now)}` : `${title}, טרם נרשם`
+        overrideText
+          ? `${title}, ${overrideText}`
+          : lastAt && now
+            ? `${title}, ${relativeHebrew(lastAt, now)}`
+            : `${title}, טרם נרשם`
       }
     >
       {/* אייקון עטוף בטבעת התקדמות */}
@@ -135,7 +142,11 @@ export function SinceCard({
       <span className="text-[0.75rem] font-medium text-muted">{title}</span>
 
       <span className="flex items-baseline gap-1" suppressHydrationWarning>
-        {compact ? (
+        {overrideText ? (
+          <span className="text-[1rem] leading-none font-semibold text-accent-text">
+            {overrideText}
+          </span>
+        ) : compact ? (
           <>
             <span className="tnum text-[1.25rem] leading-none font-semibold text-strong">
               {compact.value}

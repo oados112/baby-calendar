@@ -351,7 +351,8 @@ export function Dashboard({
             title="האכלה"
             family="feed"
             icon={IconBottle}
-            lastAt={lastFeed?.started_at ?? null}
+            lastAt={breastRunning ? null : (lastFeed?.started_at ?? null)}
+            overrideText={breastRunning ? "אוכל/ת" : undefined}
             detail={lastFeed ? summarizeEvent(lastFeed.type, lastFeed.data) : null}
             dueAfterHours={2.5}
             lateAfterHours={4}
@@ -360,14 +361,18 @@ export function Dashboard({
             title="שינה"
             family="sleep"
             icon={IconSleep}
-            lastAt={lastSleep?.started_at ?? null}
+            // הכרטיס מודד כמה זמן היא *ערה*, ולכן נמדד מרגע היקיצה
+            // ולא מרגע ההירדמות. קודם נמדד מ-started_at, ולכן שינה של
+            // שעתיים שהסתיימה לפני רבע שעה הוצגה כ"לפני שעתיים ורבע".
+            lastAt={sleepRunning ? null : (lastSleep?.ended_at ?? lastSleep?.started_at ?? null)}
+            overrideText={sleepRunning ? "ישן/ה" : undefined}
             detail={
               lastSleep?.ended_at
-                ? durationHebrew(
+                ? `ישנה ${durationHebrew(
                     (new Date(lastSleep.ended_at).getTime() -
                       new Date(lastSleep.started_at).getTime()) /
                       1000,
-                  )
+                  )}`
                 : null
             }
             dueAfterHours={2}
