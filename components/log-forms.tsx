@@ -6,6 +6,7 @@ import { Button } from "@/components/ui";
 import { checkDose, findMedicine, MEDICINES } from "@/lib/medicines";
 import { durationHebrew } from "@/lib/time";
 import type { LogInput } from "@/lib/data/log";
+import { PhotoField } from "@/components/photo";
 import type { EventRow, EventType } from "@/types/db";
 
 /**
@@ -24,6 +25,8 @@ import type { EventRow, EventType } from "@/types/db";
 
 export interface FormProps {
   babyId: string;
+  /** נדרש לנתיב התמונה — התיקייה הראשונה היא המשפחה */
+  familyId: string;
   /**
    * שולח את הרישום. לא מחזיר Promise בכוונה: המסך נסגר והרישום מופיע
    * מיד, והשמירה בפועל ממשיכה ברקע.
@@ -876,6 +879,7 @@ export function MedicineForm({
 
 export function SimpleForm({
   babyId,
+  familyId,
   submit,
   type,
   initial,
@@ -883,17 +887,32 @@ export function SimpleForm({
 }: FormProps & { type: EventType }) {
   const [note, setNote] = useState(initial?.note ?? "");
   const [at, setAt] = useState(startOf(initial));
+  const [photoPath, setPhotoPath] = useState<string | null>(
+    initial?.photo_path ?? null,
+  );
+
+  // תמונה רלוונטית לרגעים, לא לספירות. חיתול לא צריך תמונה.
+  const allowsPhoto =
+    type === "note" || type === "milestone" || type === "activity";
 
   return (
     <form
       className="flex flex-col gap-4"
       onSubmit={(e) => {
         e.preventDefault();
-        submit({ babyId, type, startedAt: at, note });
+        submit({ babyId, type, startedAt: at, note, photoPath });
         onDone();
       }}
     >
       <NoteField value={note} onChange={setNote} />
+      {allowsPhoto ? (
+        <PhotoField
+          familyId={familyId}
+          babyId={babyId}
+          value={photoPath}
+          onChange={setPhotoPath}
+        />
+      ) : null}
       <TimePicker value={at} onChange={setAt} />
       <SaveButton editing={Boolean(initial)} />
     </form>

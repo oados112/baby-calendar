@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Sheet } from "@/components/sheet";
 import { FormForType } from "@/components/log-forms";
+import { Photo } from "@/components/photo";
 import { Button } from "@/components/ui";
 import {
   IconActivity,
@@ -68,8 +69,11 @@ export function EventList({
   onEdit,
   canDelete = true,
   timeZone,
+  familyId,
 }: {
   events: EventRow[];
+  /** נדרש כדי לאפשר החלפת תמונה בעריכה */
+  familyId: string;
   memberNames: Record<string, string>;
   onDelete?: (event: EventRow) => void;
   /** שמירת עריכה. בלעדיו לא מוצג כפתור עריכה. */
@@ -118,6 +122,7 @@ export function EventList({
             <FormForType
               type={open.type}
               babyId={open.baby_id}
+              familyId={familyId}
               initial={open}
               recentEvents={events}
               submit={(input) => onEdit?.(open, input)}
@@ -276,6 +281,13 @@ function Row({
               {event.note}
             </p>
           ) : null}
+          {event.photo_path ? (
+            <Photo
+              path={event.photo_path}
+              alt={`תמונה מתוך ${meta.label}`}
+              className="mt-2 h-24 w-full max-w-48 rounded-md"
+            />
+          ) : null}
         </div>
 
         <span
@@ -346,6 +358,14 @@ function DetailSheet({
         <p className="mt-3 rounded-md bg-surface-sunken px-3 py-2.5 text-[0.9375rem] leading-relaxed text-default">
           {event.note}
         </p>
+      ) : null}
+
+      {event.photo_path ? (
+        <Photo
+          path={event.photo_path}
+          alt={`תמונה מתוך ${meta.label}`}
+          className="mt-3 max-h-[50dvh] w-full rounded-lg"
+        />
       ) : null}
 
       {canEdit ? (

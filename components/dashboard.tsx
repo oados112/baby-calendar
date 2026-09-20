@@ -57,6 +57,8 @@ export interface DashboardProps {
   memberNames: Record<string, string>;
   /** אזור הזמן של המשפחה — קובע איפה עובר הגבול בין ימים */
   timeZone: string;
+  /** מזהה המשפחה — נדרש לנתיב התמונות */
+  familyId: string;
   /** כל הילדים במשפחה — המחליף מוצג רק כשיש יותר מאחד */
   siblings?: DashboardBaby[];
   /** האם יש עוד רישומים ישנים מעבר לעמוד הראשון */
@@ -116,6 +118,7 @@ export function Dashboard({
   memberNames,
   currentUserId,
   timeZone,
+  familyId,
   siblings = [],
   hasMore = false,
   demo = false,
@@ -398,6 +401,7 @@ export function Dashboard({
                 events={events}
                 memberNames={memberNames}
                 timeZone={timeZone}
+                familyId={familyId}
                 onDelete={handleDelete}
                 onEdit={handleEdit}
               />
@@ -462,6 +466,7 @@ export function Dashboard({
             (lastBottle?.data as { amount_ml?: number } | null)?.amount_ml ?? null
           }
           recentEvents={events}
+          familyId={familyId}
           demo={demo}
           submit={submit}
           onPick={(type) => setSheet(type)}
@@ -491,6 +496,7 @@ export function Dashboard({
 function LogSheet({
   kind,
   babyId,
+  familyId,
   lastAmountMl,
   recentEvents,
   demo,
@@ -504,6 +510,7 @@ function LogSheet({
   kind: EventType | "more" | "breast_start";
   babyId: string;
   lastAmountMl: number | null;
+  familyId: string;
   /** לבדיקת מרווח בין מנות תרופה */
   recentEvents: EventRow[];
   demo: boolean;
@@ -564,7 +571,7 @@ function LogSheet({
   }
 
   const meta = EVENT_META[kind];
-  const props = { babyId, submit, onDone, onError, recentEvents };
+  const props = { babyId, familyId, submit, onDone, onError, recentEvents };
 
   return (
     <Sheet title={`רישום ${meta.label}`} onClose={onClose}>

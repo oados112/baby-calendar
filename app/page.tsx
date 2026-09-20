@@ -25,6 +25,7 @@ export default async function HomePage() {
         timers={[]}
         memberNames={DEMO_MEMBER_NAMES}
         timeZone="Asia/Jerusalem"
+        familyId="demo-family"
         demo
       />
     );
@@ -50,6 +51,7 @@ export default async function HomePage() {
         memberNames={snapshot.memberNames}
         currentUserId={snapshot.member.user_id}
         timeZone={snapshot.timeZone}
+        familyId={snapshot.member.family_id}
         siblings={snapshot.babies}
         hasMore={hasMore}
       />
@@ -79,6 +81,7 @@ export default async function HomePage() {
       memberNames={memberNames}
       currentUserId={context.member.user_id}
       timeZone={context.timeZone}
+      familyId={context.member.family_id}
       siblings={context.babies}
       hasMore={hasMore}
     />

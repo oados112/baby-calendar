@@ -21,6 +21,7 @@ export interface LogInput {
   endedAt?: Date | null;
   data?: Record<string, unknown>;
   note?: string | null;
+  photoPath?: string | null;
 }
 
 export async function logEvent(
@@ -40,6 +41,7 @@ export async function logEvent(
       ended_at: input.endedAt ? input.endedAt.toISOString() : null,
       data: (input.data ?? {}) as Json,
       note: input.note?.trim() || null,
+      photo_path: input.photoPath ?? null,
       created_by: userId,
     })
     .select("id")
@@ -142,6 +144,7 @@ export interface EventPatch {
   endedAt?: Date | null;
   data?: Record<string, unknown>;
   note?: string | null;
+  photoPath?: string | null;
 }
 
 export async function updateEvent(
@@ -158,6 +161,7 @@ export async function updateEvent(
   }
   if (patch.data !== undefined) payload.data = patch.data as Json;
   if (patch.note !== undefined) payload.note = patch.note?.trim() || null;
+  if (patch.photoPath !== undefined) payload.photo_path = patch.photoPath;
 
   const { error } = await supabase.from("events").update(payload).eq("id", eventId);
   if (error) throw new Error(error.message);

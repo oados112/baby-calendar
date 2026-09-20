@@ -21,11 +21,13 @@ export function DayEvents({
   events: fromServer,
   memberNames,
   currentUserId,
+  familyId,
   emptyLabel,
 }: {
   events: EventRow[];
   memberNames: Record<string, string>;
   currentUserId: string;
+  familyId: string;
   emptyLabel: string;
 }) {
   const router = useRouter();
@@ -110,6 +112,7 @@ export function DayEvents({
       <EventList
         events={events}
         memberNames={memberNames}
+        familyId={familyId}
         onDelete={handleDelete}
         onEdit={handleEdit}
       />

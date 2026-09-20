@@ -36,6 +36,7 @@ export default async function JournalPage({ searchParams }: PageProps<"/journal"
         events={events}
         memberNames={DEMO_MEMBER_NAMES}
         currentUserId="demo-user-1"
+        familyId="demo-family"
       />
     );
   }
@@ -67,6 +68,7 @@ export default async function JournalPage({ searchParams }: PageProps<"/journal"
       events={events}
       memberNames={memberNames}
       currentUserId={context.member.user_id}
+      familyId={context.member.family_id}
     />
   );
 }
