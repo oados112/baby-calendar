@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { PageNav } from "@/components/page-nav";
 import { GrowthPanel } from "@/components/growth-panel";
 import { BarChart, SleepHeatmap, StatTile, type BarDatum } from "@/components/charts";
@@ -139,6 +140,13 @@ export function WeekView({
         )}
 
         <GrowthPanel events={growth} birthWeightG={birthWeightG} />
+
+        <Link
+          href="/doctor"
+          className="mt-5 flex min-h-tap-comfy items-center justify-center rounded-lg border border-subtle bg-surface-card text-[0.9375rem] font-medium text-accent-text"
+        >
+          סיכום לרופא
+        </Link>
       </main>
     </div>
   );

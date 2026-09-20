@@ -2,9 +2,23 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { isSupabaseConfigured } from "@/lib/config";
 
-/** נתיבים שפתוחים למי שלא מחובר. */
-// /api/auth הוא מסלול הכניסה עצמו — חסימתו הייתה מונעת מכל אחד להתחבר
-const PUBLIC_PATHS = ["/login", "/auth/callback", "/api/auth", "/invite", "/offline"];
+/**
+ * נתיבים שאינם דורשים סשן מחובר.
+ *
+ * שניים מהם הם נקודות קצה ולא מסכים, ולכל אחד יש שכבת הגנה משלו:
+ *   /api/auth — מסלול הכניסה עצמו. חסימתו מנעה מכל אחד להתחבר.
+ *   /api/cron — מנוע התזכורות, שנקרא מ-Supabase ולא מדפדפן. הוא מוגן
+ *               בסוד משותף בכותרת. בלי החרגה כאן הוא קיבל הפניה
+ *               ל-/login ומעולם לא רץ — וזו הסיבה שההתראות לא הגיעו.
+ */
+const PUBLIC_PATHS = [
+  "/login",
+  "/auth/callback",
+  "/api/auth",
+  "/api/cron",
+  "/invite",
+  "/offline",
+];
 
 function isPublic(pathname: string) {
   return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
