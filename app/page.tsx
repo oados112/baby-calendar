@@ -7,6 +7,7 @@ import {
   getEventsPage,
   getFamilyContext,
   getHomeSnapshot,
+  getMedicationPlans,
   getMemberNames,
   getSelectedBaby,
   getSelectedBabyId,
@@ -42,6 +43,7 @@ export default async function HomePage() {
     if (!baby) redirect("/onboarding");
 
     const hasMore = snapshot.events.length > PAGE_SIZE;
+    const plans = await getMedicationPlans(baby.id);
 
     return (
       <Dashboard
@@ -53,6 +55,7 @@ export default async function HomePage() {
         timeZone={snapshot.timeZone}
         familyId={snapshot.member.family_id}
         siblings={snapshot.babies}
+        medicationPlans={plans}
         hasMore={hasMore}
       />
     );
@@ -64,11 +67,12 @@ export default async function HomePage() {
   const baby = await getSelectedBaby(context.babies);
   if (!baby) redirect("/onboarding");
 
-  const [page, timers, memberNames] = await Promise.all([
+  const [page, timers, memberNames, plans] = await Promise.all([
     // מבקשים אחד יותר מהעמוד, כדי לדעת אם יש עוד בלי שאילתת ספירה
     getEventsPage(baby.id, PAGE_SIZE + 1),
     getActiveTimers(baby.id),
     getMemberNames(context.member.family_id),
+    getMedicationPlans(baby.id),
   ]);
 
   const hasMore = page.length > PAGE_SIZE;
@@ -83,6 +87,7 @@ export default async function HomePage() {
       timeZone={context.timeZone}
       familyId={context.member.family_id}
       siblings={context.babies}
+      medicationPlans={plans}
       hasMore={hasMore}
     />
   );

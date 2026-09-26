@@ -7,6 +7,7 @@ import { Button } from "@/components/ui";
 import { TimerPanel } from "@/components/timer-panel";
 import { PageNav } from "@/components/page-nav";
 import { SyncBanner } from "@/components/sync-banner";
+import { DueMedications } from "@/components/due-medications";
 import { BabySwitcher } from "@/components/baby-switcher";
 import { FormForType } from "@/components/log-forms";
 import {
@@ -38,6 +39,7 @@ import { EventList } from "@/components/event-list";
 import { makeTempId, useLiveData } from "@/lib/use-live-data";
 import { enqueue, isNetworkError } from "@/lib/offline-queue";
 import { deletePhotoQuietly } from "@/lib/photos";
+import type { MedicationPlan } from "@/lib/medication-plans";
 import type { ActiveTimerRow, EventRow, EventType } from "@/types/db";
 
 export interface DashboardBaby {
@@ -62,6 +64,8 @@ export interface DashboardProps {
   familyId: string;
   /** כל הילדים במשפחה — המחליף מוצג רק כשיש יותר מאחד */
   siblings?: DashboardBaby[];
+  /** סל התרופות והוויטמינים הקבועים */
+  medicationPlans?: MedicationPlan[];
   /** האם יש עוד רישומים ישנים מעבר לעמוד הראשון */
   hasMore?: boolean;
   /** מצב תצוגה עם נתוני דוגמה — הכתיבה מושבתת */
@@ -121,6 +125,7 @@ export function Dashboard({
   timeZone,
   familyId,
   siblings = [],
+  medicationPlans = [],
   hasMore = false,
   demo = false,
 }: DashboardProps) {
@@ -343,6 +348,14 @@ export function Dashboard({
       {demo ? null : <SyncBanner userId={currentUserId ?? ""} />}
 
       <main id="main" className="flex-1 px-4 pb-32">
+        <DueMedications
+          plans={medicationPlans}
+          events={events}
+          timeZone={timeZone}
+          babyId={baby.id}
+          submit={submit}
+        />
+
         <TimerPanel
           babyId={baby.id}
           timers={timers}
@@ -477,6 +490,7 @@ export function Dashboard({
             (lastBottle?.data as { amount_ml?: number } | null)?.amount_ml ?? null
           }
           recentEvents={events}
+          medicationPlans={medicationPlans}
           familyId={familyId}
           demo={demo}
           submit={submit}
@@ -510,6 +524,7 @@ function LogSheet({
   familyId,
   lastAmountMl,
   recentEvents,
+  medicationPlans,
   demo,
   submit,
   onPick,
@@ -524,6 +539,7 @@ function LogSheet({
   familyId: string;
   /** לבדיקת מרווח בין מנות תרופה */
   recentEvents: EventRow[];
+  medicationPlans: MedicationPlan[];
   demo: boolean;
   submit: (input: LogInput) => void;
   onPick: (type: EventType) => void;
@@ -582,7 +598,15 @@ function LogSheet({
   }
 
   const meta = EVENT_META[kind];
-  const props = { babyId, familyId, submit, onDone, onError, recentEvents };
+  const props = {
+    babyId,
+    familyId,
+    submit,
+    onDone,
+    onError,
+    recentEvents,
+    medicationPlans,
+  };
 
   return (
     <Sheet title={`רישום ${meta.label}`} onClose={onClose}>

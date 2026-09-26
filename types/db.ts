@@ -133,6 +133,28 @@ export type ReminderRuleRow = {
   updated_at: string;
 };
 
+export type MedicationPlanRow = {
+  id: string;
+  family_id: string;
+  baby_id: string;
+  kind: "vitamin" | "medicine";
+  name: string;
+  dose_amount: number | null;
+  dose_unit: string | null;
+  schedule: "interval" | "daily_at" | "as_needed";
+  every_hours: number | null;
+  daily_at: string | null;
+  max_per_day: number | null;
+  starts_on: string | null;
+  ends_on: string | null;
+  reminder_enabled: boolean;
+  is_active: boolean;
+  note: string | null;
+  created_at: string;
+  created_by: string | null;
+  updated_at: string;
+};
+
 type TableDef<Row, Insert = Partial<Row>, Update = Partial<Row>> = {
   Row: Row;
   Insert: Insert;
@@ -158,6 +180,10 @@ export interface Database {
           Partial<PushSubscriptionRow>
       >;
       reminder_rules: TableDef<ReminderRuleRow>;
+      medication_plans: TableDef<
+        MedicationPlanRow,
+        Pick<MedicationPlanRow, "baby_id" | "name"> & Partial<MedicationPlanRow>
+      >;
     };
     Views: { [_ in never]: never };
     Functions: {

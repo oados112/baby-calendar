@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useNow } from "@/lib/use-now";
 import { Button } from "@/components/ui";
 import { checkDose, findMedicine, MEDICINES } from "@/lib/medicines";
+import { describeDose, describeSchedule, type MedicationPlan } from "@/lib/medication-plans";
 import { durationHebrew } from "@/lib/time";
 import type { LogInput } from "@/lib/data/log";
 import { PhotoField } from "@/components/photo";
@@ -39,6 +40,8 @@ export interface FormProps {
   onError: (message: string) => void;
   /** רישומים אחרונים — משמשים לבדיקת מרווח בין מנות תרופה */
   recentEvents?: { type: string; started_at: string; data: unknown }[];
+  /** סל התרופות הקבועות — מופיע כבחירה מהירה בטופס התרופה */
+  medicationPlans?: MedicationPlan[];
 }
 
 /* ---------------------------------------------------------------- כלי עזר */
@@ -762,8 +765,10 @@ export function MedicineForm({
   onDone,
   onError,
   recentEvents = [],
+  medicationPlans = [],
 }: FormProps) {
   const d = initialData(initial);
+  const [planId, setPlanId] = useState<string | null>(str(d, "plan_id"));
   const [medicineId, setMedicineId] = useState(
     str(d, "medicine_id") ?? MEDICINES[0].id,
   );
@@ -809,6 +814,8 @@ export function MedicineForm({
           startedAt: at,
           note,
           data: {
+            // plan_id מקשר את המנה לתוכנית, כדי שהתזכורת תדע שניתנה
+            plan_id: planId,
             medicine_id: medicineId,
             name,
             dose: dose ? parseFloat(dose) : null,
@@ -819,6 +826,45 @@ export function MedicineForm({
         onDone();
       }}
     >
+      {medicationPlans.length > 0 ? (
+        <fieldset className="flex flex-col gap-2">
+          <legend className="mb-1 text-[0.875rem] font-medium text-default">
+            מהסל שלכם
+          </legend>
+          <div className="flex flex-col gap-1.5">
+            {medicationPlans.map((plan) => (
+              <button
+                key={plan.id}
+                type="button"
+                aria-pressed={planId === plan.id}
+                onClick={() => {
+                  setPlanId(plan.id);
+                  setMedicineId("other");
+                  setCustomName(plan.name);
+                  if (plan.dose_amount !== null) setDose(String(plan.dose_amount));
+                  if (plan.dose_unit) setUnit(plan.dose_unit);
+                }}
+                className={[
+                  "rounded-md border px-3 py-2 text-start transition-colors duration-150",
+                  planId === plan.id
+                    ? "border-accent bg-accent-soft"
+                    : "border-line bg-surface-card",
+                ].join(" ")}
+              >
+                <span className="block text-[0.9375rem] font-medium text-strong">
+                  {plan.name}
+                </span>
+                <span className="block text-[0.8125rem] text-muted">
+                  {[describeDose(plan), describeSchedule(plan)]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </span>
+              </button>
+            ))}
+          </div>
+        </fieldset>
+      ) : null}
+
       <fieldset className="flex flex-col gap-2">
         <legend className="mb-1 text-[0.875rem] font-medium text-default">מה ניתן</legend>
         <div className="grid grid-cols-2 gap-1.5">
@@ -830,6 +876,7 @@ export function MedicineForm({
               onClick={() => {
                 setMedicineId(m.id);
                 setUnit(m.units[0]);
+                setPlanId(null);
               }}
               className={[
                 "min-h-tap rounded-md border px-3 text-[0.875rem] transition-colors duration-150",

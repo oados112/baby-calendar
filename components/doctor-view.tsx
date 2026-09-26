@@ -134,17 +134,43 @@ export function DoctorView({
           )}
         </Block>
 
-        <Block title="תרופות">
+        <Block title="תרופות וויטמינים">
           {summary.medicines.length === 0 ? (
             <Empty>לא ניתנו תרופות בתקופה</Empty>
           ) : (
-            summary.medicines.map((m) => (
-              <Row
-                key={m.name}
-                label={m.name}
-                value={`${m.doses} מנות · אחרונה ${shortDate(m.lastAt.slice(0, 10))}`}
-              />
-            ))
+            summary.medicines.map((m) => {
+              const dose =
+                m.dose !== null ? `${m.dose} ${m.unit ?? ""}`.trim() : null;
+              const total =
+                m.totalAmount !== null && !m.mixedDoses
+                  ? `${m.totalAmount} ${m.unit ?? ""}`.trim()
+                  : null;
+
+              return (
+                <div
+                  key={m.name}
+                  className="border-t border-subtle py-2 first:border-0"
+                >
+                  <div className="flex items-baseline justify-between gap-3">
+                    <span className="text-[0.9375rem] font-medium text-strong">
+                      {m.name}
+                    </span>
+                    <span className="tnum text-[0.9375rem] text-strong">
+                      {dose ? `${dose} × ` : ""}
+                      {m.doses} מנות
+                    </span>
+                  </div>
+                  <div className="mt-0.5 flex flex-wrap gap-x-3 text-[0.75rem] text-muted">
+                    {total ? <span>סה״כ {total}</span> : null}
+                    {m.mixedDoses ? <span>מינון משתנה בין המנות</span> : null}
+                    <span>
+                      ניתן ב-{m.daysGiven} מתוך {dayCount} ימים
+                    </span>
+                    <span>אחרונה {shortDate(m.lastAt.slice(0, 10))}</span>
+                  </div>
+                </div>
+              );
+            })
           )}
         </Block>
 

@@ -3,6 +3,11 @@ import "server-only";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { zonedParts } from "@/lib/zoned";
 import { durationHebrew } from "@/lib/time";
+import {
+  describeDose,
+  dueNow,
+  type MedicationPlan,
+} from "@/lib/medication-plans";
 
 /**
  * מנוע התזכורות.
@@ -26,7 +31,8 @@ export type ReminderKind =
   | "sleep_gap"
   | "diaper_gap"
   | "timer_running"
-  | "daily_summary";
+  | "daily_summary"
+  | "medicine";
 
 interface RuleRow {
   id: string;
@@ -121,6 +127,7 @@ export function evaluateRules({
   baby,
   events,
   timers,
+  plans,
   timeZone,
   now,
 }: {
@@ -129,6 +136,7 @@ export function evaluateRules({
   /** ממוין מהחדש לישן */
   events: EventLite[];
   timers: TimerLite[];
+  plans: MedicationPlan[];
   timeZone: string;
   now: Date;
 }): PreparedNotification[] {
@@ -139,7 +147,12 @@ export function evaluateRules({
 
   for (const rule of rules) {
     if (!rule.is_enabled) continue;
-    if (rule.kind !== "daily_summary" && inQuietHours(rule.quiet_from, rule.quiet_to, now, timeZone)) {
+    // תזכורת תרופה עוברת מעל שעות שקט: מנה שהוחמצה בלילה היא בדיוק
+    // המקרה שבו כן רוצים להתעורר. סיכום יומי ממילא מתוזמן לשעה קבועה.
+    const ignoresQuietHours =
+      rule.kind === "daily_summary" || rule.kind === "medicine";
+
+    if (!ignoresQuietHours && inQuietHours(rule.quiet_from, rule.quiet_to, now, timeZone)) {
       continue;
     }
 
@@ -234,6 +247,29 @@ export function evaluateRules({
         break;
       }
 
+      case "medicine": {
+        for (const { plan, overdueMinutes } of dueNow(plans, events, timeZone, now)) {
+          if (!plan.reminder_enabled) continue;
+
+          const dose = describeDose(plan);
+          // חלון של שעה במפתח: מזכיר שוב אם ממשיכים לא לתת, אבל לא כל
+          // חמש דקות, ונעלם לגמרי ברגע שנרשמה מנה
+          const bucket = Math.floor(overdueMinutes / 60);
+
+          add({
+            dedupeKey: `medicine:${plan.id}:${bucket}`,
+            tag: `medicine:${plan.id}`,
+            title: `${plan.name}${dose ? ` · ${dose}` : ""}`,
+            body:
+              overdueMinutes < 60
+                ? "הגיע הזמן לפי ההגדרה שלכם"
+                : `באיחור של ${durationHebrew(overdueMinutes * 60)}`,
+            url: "/",
+          });
+        }
+        break;
+      }
+
       case "daily_summary": {
         const at = typeof rule.config.at === "string" ? rule.config.at : "21:00";
         const [h, m] = at.split(":").map(Number);
@@ -305,8 +341,10 @@ export async function runReminderCycle(now = new Date()) {
     );
     if (!babyRules.length) continue;
 
-    const since = new Date(now.getTime() - 36 * 60 * MINUTE).toISOString();
-    const [{ data: events }, { data: timers }] = await Promise.all([
+    // חלון רחב יותר מהכללים האחרים: לוויטמין יומי צריך לדעת אם ניתן
+    // אתמול, ולקורס כל 12 שעות צריך את המנה הקודמת
+    const since = new Date(now.getTime() - 72 * 60 * MINUTE).toISOString();
+    const [{ data: events }, { data: timers }, { data: plans }] = await Promise.all([
       admin
         .from("events")
         .select("type, started_at, ended_at, data")
@@ -315,6 +353,11 @@ export async function runReminderCycle(now = new Date()) {
         .gte("started_at", since)
         .order("started_at", { ascending: false }),
       admin.from("active_timers").select("type, started_at").eq("baby_id", baby.id),
+      admin
+        .from("medication_plans")
+        .select("*")
+        .eq("baby_id", baby.id)
+        .eq("is_active", true),
     ]);
 
     prepared.push(
@@ -323,6 +366,7 @@ export async function runReminderCycle(now = new Date()) {
         baby,
         events: (events ?? []) as EventLite[],
         timers: (timers ?? []) as TimerLite[],
+        plans: (plans ?? []) as MedicationPlan[],
         timeZone: zoneOf.get(baby.family_id) ?? "Asia/Jerusalem",
         now,
       }),

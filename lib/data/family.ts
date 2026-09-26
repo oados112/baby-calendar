@@ -1,7 +1,13 @@
 import { cookies } from "next/headers";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { pickBaby, SELECTED_BABY_COOKIE } from "@/lib/babies";
-import type { ActiveTimerRow, BabyRow, EventRow, FamilyMemberRow } from "@/types/db";
+import type {
+  ActiveTimerRow,
+  BabyRow,
+  EventRow,
+  FamilyMemberRow,
+  MedicationPlanRow,
+} from "@/types/db";
 
 /**
  * שאילתות צד-שרת.
@@ -202,4 +208,19 @@ export async function getHomeSnapshot(
 export async function getSelectedBabyId(): Promise<string | null> {
   const store = await cookies();
   return store.get(SELECTED_BABY_COOKIE)?.value ?? null;
+}
+
+/** סל התרופות והוויטמינים הפעיל של תינוק. */
+export async function getMedicationPlans(
+  babyId: string,
+): Promise<MedicationPlanRow[]> {
+  const supabase = await getSupabaseServerClient();
+  const { data } = await supabase
+    .from("medication_plans")
+    .select("*")
+    .eq("baby_id", babyId)
+    .eq("is_active", true)
+    .order("created_at", { ascending: true });
+
+  return data ?? [];
 }

@@ -3,10 +3,15 @@ import Link from "next/link";
 import { BabySettings } from "@/components/baby-settings";
 import { FamilySettings, type CodeRow } from "@/components/family-settings";
 import { ExportSettings } from "@/components/export-settings";
+import { MedicationSettings } from "@/components/medication-settings";
 import { NotificationSettings } from "@/components/notification-settings";
 import { PageNav } from "@/components/page-nav";
 import { isSupabaseConfigured } from "@/lib/config";
-import { getFamilyContext, getMemberNames } from "@/lib/data/family";
+import {
+  getFamilyContext,
+  getMedicationPlans,
+  getMemberNames,
+} from "@/lib/data/family";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import type { ReminderRuleRow } from "@/types/db";
 
@@ -23,7 +28,7 @@ export default async function SettingsPage() {
   const supabase = await getSupabaseServerClient();
   const isAdmin = context.member.role === "admin";
 
-  const [{ data: rules }, { data: codes }, memberNames] = await Promise.all([
+  const [{ data: rules }, { data: codes }, memberNames, plans] = await Promise.all([
     supabase
       .from("reminder_rules")
       .select("*")
@@ -34,6 +39,7 @@ export default async function SettingsPage() {
       ? supabase.rpc("list_access_codes", {})
       : Promise.resolve({ data: [] as CodeRow[] }),
     getMemberNames(context.member.family_id),
+    baby ? getMedicationPlans(baby.id) : Promise.resolve([]),
   ]);
 
   return (
@@ -45,6 +51,8 @@ export default async function SettingsPage() {
 
         <div className="flex flex-col gap-6">
           {baby ? <BabySettings baby={baby} /> : null}
+
+          {baby ? <MedicationSettings babyId={baby.id} plans={plans} /> : null}
 
           <NotificationSettings
             userId={context.member.user_id}

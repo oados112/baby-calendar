@@ -43,6 +43,10 @@ const KIND_LABELS: Record<string, { title: string; hint: string; unit?: string }
     hint: "כשטיימר רץ הרבה מעבר לרגיל",
     unit: "דקות",
   },
+  medicine: {
+    title: "תרופות וויטמינים",
+    hint: "כשהגיע הזמן ולא נרשם. עובר מעל שעות שקט, ולא חל על תרופות לפי הצורך",
+  },
   daily_summary: {
     title: "תקציר יומי",
     hint: "סיכום קצר של היום בשעה קבועה",
