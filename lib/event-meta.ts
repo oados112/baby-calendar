@@ -289,6 +289,16 @@ export function summarizeEvent(type: EventType, data: unknown): string | null {
       if (hc) parts.push(`היקף ראש ${hc}`);
       return parts.join(" · ") || null;
     }
+    case "vaccine": {
+      const name = typeof d.name === "string" ? d.name : null;
+      const dose =
+        typeof d.dose === "number" && typeof d.of === "number" && d.of > 1
+          ? `מנה ${d.dose} מתוך ${d.of}`
+          : null;
+      // "לא ניתן" הוא החלטה מודעת שנרשמה, ולא אותו דבר כמו חיסון שניתן
+      const skipped = d.skipped === true ? "לא ניתן" : null;
+      return [name, dose, skipped].filter(Boolean).join(" · ") || null;
+    }
     case "medicine": {
       const name = typeof d.name === "string" ? d.name : null;
       const dose = typeof d.dose === "string" ? d.dose : null;

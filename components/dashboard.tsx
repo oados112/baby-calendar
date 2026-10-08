@@ -9,6 +9,7 @@ import { PageNav } from "@/components/page-nav";
 import { SyncBanner } from "@/components/sync-banner";
 import { DueMedications } from "@/components/due-medications";
 import { RefreshButton } from "@/components/refresh-button";
+import { DueVaccines } from "@/components/due-vaccines";
 import { RhythmBar } from "@/components/rhythm-bar";
 import { BabySwitcher } from "@/components/baby-switcher";
 import { FormForType } from "@/components/log-forms";
@@ -42,6 +43,7 @@ import { makeTempId, useLiveData } from "@/lib/use-live-data";
 import { enqueue, isNetworkError } from "@/lib/offline-queue";
 import { deletePhotoQuietly } from "@/lib/photos";
 import type { MedicationPlan } from "@/lib/medication-plans";
+import type { VaccineItem } from "@/lib/vaccines";
 import type { ActiveTimerRow, EventRow, EventType } from "@/types/db";
 
 export interface DashboardBaby {
@@ -68,6 +70,8 @@ export interface DashboardProps {
   siblings?: DashboardBaby[];
   /** סל התרופות והוויטמינים הקבועים */
   medicationPlans?: MedicationPlan[];
+  /** חיסונים שהגיע זמנם — מחושב בשרת, על כל ההיסטוריה */
+  dueVaccines?: VaccineItem[];
   /** האם יש עוד רישומים ישנים מעבר לעמוד הראשון */
   hasMore?: boolean;
   /** מצב תצוגה עם נתוני דוגמה — הכתיבה מושבתת */
@@ -128,6 +132,7 @@ export function Dashboard({
   familyId,
   siblings = [],
   medicationPlans = [],
+  dueVaccines = [],
   hasMore = false,
   demo = false,
 }: DashboardProps) {
@@ -360,6 +365,8 @@ export function Dashboard({
       {demo ? null : <SyncBanner userId={currentUserId ?? ""} />}
 
       <main id="main" className="flex-1 px-4 pb-32">
+        <DueVaccines pending={dueVaccines} />
+
         <DueMedications
           plans={medicationPlans}
           events={events}

@@ -7,6 +7,8 @@ import {
 } from "@/lib/event-meta";
 import { averageOf, formatHours, summarizeDays, type DaySummary } from "@/lib/stats";
 import { dayKey, lastDayKeys } from "@/lib/zoned";
+import { shortDate } from "@/lib/zoned";
+import type { VaccineItem } from "@/lib/vaccines";
 import type { EventRow } from "@/types/db";
 
 /**
@@ -237,6 +239,7 @@ export function summaryAsText(
   summary: MedicalSummary,
   babyName: string,
   dayCount: number,
+  vaccines: VaccineItem[] = [],
 ): string {
   const lines: string[] = [
     `${babyName} — סיכום ${dayCount} הימים האחרונים`,
@@ -281,6 +284,27 @@ export function summaryAsText(
 
   if (summary.highestTemp !== null) {
     lines.push(`חום מרבי שנמדד: ${summary.highestTemp.toFixed(1)}°`);
+  }
+
+  const givenVaccines = vaccines
+    .filter((v) => v.state === "given" && v.givenAt)
+    .sort((a, b) => a.givenAt!.localeCompare(b.givenAt!));
+
+  if (givenVaccines.length > 0) {
+    lines.push("", "חיסונים שניתנו:");
+    for (const v of givenVaccines) {
+      const dose = v.dose.of > 1 ? ` (${v.dose.dose}/${v.dose.of})` : "";
+      lines.push(`  ${v.dose.name}${dose}: ${shortDate(v.givenAt!.slice(0, 10))}`);
+    }
+
+    const waiting = vaccines.filter(
+      (v) => v.state === "due" || v.state === "overdue",
+    );
+    if (waiting.length > 0) {
+      lines.push(
+        `  ממתינים: ${[...new Set(waiting.map((v) => v.dose.name))].join(" · ")}`,
+      );
+    }
   }
 
   if (summary.medicines.length > 0) {

@@ -8,6 +8,7 @@ import {
   dueNow,
   type MedicationPlan,
 } from "@/lib/medication-plans";
+import { pendingVaccines, vaccineItems } from "@/lib/vaccines";
 
 /**
  * מנוע התזכורות.
@@ -32,7 +33,8 @@ export type ReminderKind =
   | "diaper_gap"
   | "timer_running"
   | "daily_summary"
-  | "medicine";
+  | "medicine"
+  | "vaccine_due";
 
 interface RuleRow {
   id: string;
@@ -50,6 +52,7 @@ interface BabyRow {
   id: string;
   family_id: string;
   name: string | null;
+  birth_date: string;
 }
 
 interface EventLite {
@@ -62,6 +65,15 @@ interface EventLite {
 interface TimerLite {
   type: string;
   started_at: string;
+}
+
+/** מה ש-vaccineItems צריך מאירוע חיסון. */
+interface VaccineEventLite {
+  id: string;
+  type: string;
+  started_at: string;
+  data: Record<string, unknown> | null;
+  deleted_at: string | null;
 }
 
 export interface PreparedNotification {
@@ -128,6 +140,7 @@ export function evaluateRules({
   events,
   timers,
   plans,
+  vaccineEvents = [],
   timeZone,
   now,
 }: {
@@ -137,6 +150,8 @@ export function evaluateRules({
   events: EventLite[];
   timers: TimerLite[];
   plans: MedicationPlan[];
+  /** כל אירועי החיסון אי פעם — חלון 72 השעות אינו רלוונטי כאן */
+  vaccineEvents?: VaccineEventLite[];
   timeZone: string;
   now: Date;
 }): PreparedNotification[] {
@@ -270,6 +285,35 @@ export function evaluateRules({
         break;
       }
 
+      /**
+       * חיסון שהגיע זמנו.
+       *
+       * פעם ביום לכל היותר, ורק בשעה סבירה: אין שום דבר שאפשר לעשות
+       * עם זה בשלוש לפנות בוקר, ובטיפת חלב ממילא מזמנים תור.
+       */
+      case "vaccine_due": {
+        const { hour } = zonedParts(now, timeZone);
+        if (hour < 9 || hour >= 11) break;
+
+        const waiting = pendingVaccines(
+          vaccineItems(baby.birth_date, vaccineEvents, now),
+        );
+        if (waiting.length === 0) break;
+
+        const names = [...new Set(waiting.map((v) => v.dose.name))].join(" · ");
+        const overdue = waiting.some((v) => v.state === "overdue");
+        const today = now.toISOString().slice(0, 10);
+
+        add({
+          dedupeKey: `vaccine:${today}`,
+          tag: "vaccine",
+          title: overdue ? `${name} — חיסון באיחור` : `${name} — חיסון בגיל הזה`,
+          body: names,
+          url: "/vaccines",
+        });
+        break;
+      }
+
       case "daily_summary": {
         const at = typeof rule.config.at === "string" ? rule.config.at : "21:00";
         const [h, m] = at.split(":").map(Number);
@@ -320,7 +364,7 @@ export async function runReminderCycle(now = new Date()) {
   const admin = getSupabaseAdminClient();
 
   const [{ data: babies }, { data: rules }] = await Promise.all([
-    admin.from("babies").select("id, family_id, name").eq("is_active", true),
+    admin.from("babies").select("id, family_id, name, birth_date").eq("is_active", true),
     admin.from("reminder_rules").select("*").eq("is_enabled", true),
   ]);
 
@@ -344,7 +388,11 @@ export async function runReminderCycle(now = new Date()) {
     // חלון רחב יותר מהכללים האחרים: לוויטמין יומי צריך לדעת אם ניתן
     // אתמול, ולקורס כל 12 שעות צריך את המנה הקודמת
     const since = new Date(now.getTime() - 72 * 60 * MINUTE).toISOString();
-    const [{ data: events }, { data: timers }, { data: plans }] = await Promise.all([
+    // נשלפים רק אם יש כלל שצריך אותם — ברוב המשפחות זו שאילתה מיותרת
+    const wantsVaccines = babyRules.some((r) => r.kind === "vaccine_due");
+
+    const [{ data: events }, { data: timers }, { data: plans }, vaccines] =
+      await Promise.all([
       admin
         .from("events")
         .select("type, started_at, ended_at, data")
@@ -358,6 +406,14 @@ export async function runReminderCycle(now = new Date()) {
         .select("*")
         .eq("baby_id", baby.id)
         .eq("is_active", true),
+      wantsVaccines
+        ? admin
+            .from("events")
+            .select("id, type, started_at, data, deleted_at")
+            .eq("baby_id", baby.id)
+            .eq("type", "vaccine")
+            .is("deleted_at", null)
+        : Promise.resolve({ data: [] }),
     ]);
 
     prepared.push(
@@ -367,6 +423,7 @@ export async function runReminderCycle(now = new Date()) {
         events: (events ?? []) as EventLite[],
         timers: (timers ?? []) as TimerLite[],
         plans: (plans ?? []) as MedicationPlan[],
+        vaccineEvents: (vaccines.data ?? []) as VaccineEventLite[],
         timeZone: zoneOf.get(baby.family_id) ?? "Asia/Jerusalem",
         now,
       }),

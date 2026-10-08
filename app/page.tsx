@@ -11,8 +11,10 @@ import {
   getMemberNames,
   getSelectedBaby,
   getSelectedBabyId,
+  getVaccineEvents,
 } from "@/lib/data/family";
 import { pickBaby } from "@/lib/babies";
+import { pendingVaccines, vaccineItems } from "@/lib/vaccines";
 
 const PAGE_SIZE = 40;
 
@@ -43,7 +45,11 @@ export default async function HomePage() {
     if (!baby) redirect("/onboarding");
 
     const hasMore = snapshot.events.length > PAGE_SIZE;
-    const plans = await getMedicationPlans(baby.id);
+    // במקביל ולא בזה אחר זה — שתיהן קטנות, ואין סיבה שאחת תחכה לשנייה
+    const [plans, vaccines] = await Promise.all([
+      getMedicationPlans(baby.id),
+      getVaccineEvents(baby.id),
+    ]);
 
     return (
       <Dashboard
@@ -56,6 +62,7 @@ export default async function HomePage() {
         familyId={snapshot.member.family_id}
         siblings={snapshot.babies}
         medicationPlans={plans}
+        dueVaccines={pendingVaccines(vaccineItems(baby.birth_date, vaccines))}
         hasMore={hasMore}
       />
     );
@@ -67,12 +74,13 @@ export default async function HomePage() {
   const baby = await getSelectedBaby(context.babies);
   if (!baby) redirect("/onboarding");
 
-  const [page, timers, memberNames, plans] = await Promise.all([
+  const [page, timers, memberNames, plans, vaccines] = await Promise.all([
     // מבקשים אחד יותר מהעמוד, כדי לדעת אם יש עוד בלי שאילתת ספירה
     getEventsPage(baby.id, PAGE_SIZE + 1),
     getActiveTimers(baby.id),
     getMemberNames(context.member.family_id),
     getMedicationPlans(baby.id),
+    getVaccineEvents(baby.id),
   ]);
 
   const hasMore = page.length > PAGE_SIZE;
@@ -88,6 +96,7 @@ export default async function HomePage() {
       familyId={context.member.family_id}
       siblings={context.babies}
       medicationPlans={plans}
+      dueVaccines={pendingVaccines(vaccineItems(baby.birth_date, vaccines))}
       hasMore={hasMore}
     />
   );

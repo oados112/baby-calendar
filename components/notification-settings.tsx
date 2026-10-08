@@ -47,6 +47,10 @@ const KIND_LABELS: Record<string, { title: string; hint: string; unit?: string }
     title: "תרופות וויטמינים",
     hint: "כשהגיע הזמן ולא נרשם. עובר מעל שעות שקט, ולא חל על תרופות לפי הצורך",
   },
+  vaccine_due: {
+    title: "חיסון שהגיע זמנו",
+    hint: "פעם ביום בבוקר, לפי לוח חיסוני השגרה וגיל התינוק/ת",
+  },
   daily_summary: {
     title: "תקציר יומי",
     hint: "סיכום קצר של היום בשעה קבועה",

@@ -54,6 +54,23 @@ export default async function SettingsPage() {
 
           {baby ? <MedicationSettings babyId={baby.id} plans={plans} /> : null}
 
+          {/* קישור ולא רכיב: לוח החיסונים הוא מסך שמבקרים בו פעם
+              בחודש, לא הגדרה שמשנים */}
+          <Link
+            href="/vaccines"
+            className="flex items-center justify-between gap-3 rounded-lg border border-subtle bg-surface-card px-4 py-3.5 transition-transform duration-150 active:scale-[0.99]"
+          >
+            <span>
+              <span className="block text-[0.9375rem] font-semibold text-strong">
+                חיסונים
+              </span>
+              <span className="block text-[0.8125rem] text-muted">
+                לוח חיסוני השגרה, ומה כבר ניתן
+              </span>
+            </span>
+            <span className="shrink-0 text-[0.8125rem] text-accent-text">פתיחה</span>
+          </Link>
+
           <NotificationSettings
             userId={context.member.user_id}
             rules={(rules ?? []) as ReminderRuleRow[]}

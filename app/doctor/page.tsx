@@ -5,7 +5,9 @@ import {
   getEventsBetween,
   getFamilyContext,
   getSelectedBaby,
+  getVaccineEvents,
 } from "@/lib/data/family";
+import { vaccineItems } from "@/lib/vaccines";
 import { buildMedicalSummary } from "@/lib/medical-summary";
 import { babyDisplayName } from "@/lib/baby";
 import { babyAgeHebrew } from "@/lib/time";
@@ -42,9 +44,14 @@ export default async function DoctorPage({ searchParams }: PageProps<"/doctor">)
 
   const summary = buildMedicalSummary(events, timeZone, dayCount);
 
+  // החיסונים נשלפים בנפרד ולא מוגבלים לחלון הימים שנבחר: הם ניתנים
+  // אחת לחודשיים, והשאלה "מה קיבלה עד היום" אינה שאלה על השבוע
+  const vaccines = vaccineItems(baby.birth_date, await getVaccineEvents(baby.id));
+
   return (
     <DoctorView
       summary={summary}
+      vaccines={vaccines}
       babyName={babyDisplayName(baby.name)}
       babyAge={babyAgeHebrew(baby.birth_date, baby.sex)}
       dayCount={dayCount}

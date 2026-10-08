@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui";
 import { formatHours } from "@/lib/stats";
 import { summaryAsText, type MedicalSummary } from "@/lib/medical-summary";
+import type { VaccineItem } from "@/lib/vaccines";
 import { formatClock } from "@/lib/time";
 import { longDate, shortDate, weekdayShort } from "@/lib/zoned";
 
@@ -20,11 +21,14 @@ import { longDate, shortDate, weekdayShort } from "@/lib/zoned";
 export function DoctorView({
   summary,
   babyName,
+  vaccines = [],
   babyAge,
   dayCount,
 }: {
   summary: MedicalSummary;
   babyName: string;
+  /** מצב כל שורה בלוח החיסונים — ריק כשאין תאריך לידה */
+  vaccines?: VaccineItem[];
   babyAge: string;
   dayCount: number;
 }) {
@@ -33,7 +37,7 @@ export function DoctorView({
   async function copy() {
     try {
       await navigator.clipboard.writeText(
-        summaryAsText(summary, babyName, dayCount),
+        summaryAsText(summary, babyName, dayCount, vaccines),
       );
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
@@ -87,6 +91,36 @@ export function DoctorView({
           ) : null}
           <Row label="שינה" value={formatHours(summary.avgSleepMinutes)} />
           <Row label="חיתולים" value={summary.avgDiapers.toFixed(1)} />
+        </Block>
+
+        <Block title="חיסונים">
+          {vaccines.length === 0 ? (
+            <Empty>אין נתוני חיסונים</Empty>
+          ) : (
+            <>
+              {/* מה שניתן, והבא בתור. רופא שואל את שתי השאלות האלה
+                  ואף אחת מהן אינה בתוך חלון הימים שנבחר למעלה */}
+              {given(vaccines).length === 0 ? (
+                <Empty>עדיין לא נרשמו חיסונים</Empty>
+              ) : (
+                given(vaccines).map((v) => (
+                  <Row
+                    key={v.dose.id}
+                    label={`${v.dose.name}${v.dose.of > 1 ? ` (${v.dose.dose}/${v.dose.of})` : ""}`}
+                    value={shortDate(v.givenAt!.slice(0, 10))}
+                  />
+                ))
+              )}
+              {pending(vaccines).length > 0 ? (
+                <Row
+                  label="ממתינים"
+                  value={[...new Set(pending(vaccines).map((v) => v.dose.name))].join(
+                    " · ",
+                  )}
+                />
+              ) : null}
+            </>
+          )}
         </Block>
 
         <Block title="יציאות">
@@ -300,4 +334,16 @@ function Empty({ children }: { children: React.ReactNode }) {
 /** "צהוב 6 · ירוק 2" */
 function countsText(entries: { label: string; count: number }[]): string {
   return entries.map((e) => `${e.label} ${e.count}`).join(" · ");
+}
+
+/** החיסונים שכבר ניתנו, לפי סדר המתן. */
+function given(items: VaccineItem[]): VaccineItem[] {
+  return items
+    .filter((i) => i.state === "given" && i.givenAt)
+    .sort((a, b) => a.givenAt!.localeCompare(b.givenAt!));
+}
+
+/** מה שהגיע זמנו ועדיין לא ניתן. */
+function pending(items: VaccineItem[]): VaccineItem[] {
+  return items.filter((i) => i.state === "due" || i.state === "overdue");
 }

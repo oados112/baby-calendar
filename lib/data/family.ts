@@ -248,3 +248,17 @@ export async function getPhotoEvents(
 
   return data ?? [];
 }
+
+/** כל אירועי החיסון, מהחדש לישן. מעט שורות גם אחרי שנים. */
+export async function getVaccineEvents(babyId: string): Promise<EventRow[]> {
+  const supabase = await getSupabaseServerClient();
+  const { data } = await supabase
+    .from("events")
+    .select("*")
+    .eq("baby_id", babyId)
+    .eq("type", "vaccine")
+    .is("deleted_at", null)
+    .order("started_at", { ascending: false });
+
+  return data ?? [];
+}
