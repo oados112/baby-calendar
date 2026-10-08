@@ -318,3 +318,31 @@ export async function searchEvents(
   if (error) throw new Error(error.message);
   return data ?? [];
 }
+
+/**
+ * חותמות הזמן של ההאכלות האחרונות, לחישוב הקצב.
+ *
+ * שאילתה נפרדת ולא שימוש ברשימת הרישומים שעל המסך: הקצב מחושב לפי
+ * שעה ביום, וכדי שיהיו מספיק דגימות בכל חלק של היממה צריך כמה ימים
+ * אחורה — העמוד הראשון של היומן מכסה שלושה-ארבעה. נשלפת עמודה אחת,
+ * אחרי הציור הראשון, כך שהיא לא מעכבת כלום.
+ */
+export async function fetchFeedTimes(
+  babyId: string,
+  days = 10,
+): Promise<number[]> {
+  const since = new Date(Date.now() - days * 86_400_000).toISOString();
+
+  const supabase = getSupabaseBrowserClient();
+  const { data, error } = await supabase
+    .from("events")
+    .select("started_at")
+    .eq("baby_id", babyId)
+    .in("type", ["feed_breast", "feed_bottle", "solids"])
+    .is("deleted_at", null)
+    .gte("started_at", since)
+    .order("started_at", { ascending: false });
+
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((r) => new Date(r.started_at).getTime());
+}

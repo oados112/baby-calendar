@@ -1,7 +1,9 @@
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
 import { IconClock } from "@/components/icons";
-import { feedRhythm } from "@/lib/rhythm";
+import { feedRhythm, feedTimes } from "@/lib/rhythm";
+import { fetchFeedTimes } from "@/lib/data/log";
 import { formatClock } from "@/lib/time";
 import { useNow } from "@/lib/use-now";
 import type { EventRow } from "@/types/db";
@@ -13,11 +15,14 @@ import type { EventRow } from "@/types/db";
  * ההיסטוריה שכבר נרשמה לדבר היחיד שרוצים לדעת ברגע נתון — אם יש זמן
  * לעשות מקלחת או שעוד מעט מתחילים.
  *
+ * הקצב מחושב לפי השעה ביום, כי מרווח הלילה ארוך בהרבה ממרווח הבוקר
+ * ומספר אחד לשניהם אינו נכון באף אחד מהם.
+ *
  * מוצגת רק כשיש מספיק היסטוריה לקצב אמיתי, ונעלמת בזמן הנקה —
  * באמצע האכלה אין טעם לנבא את הבאה.
  */
 
-/** "2:40" לשעות, "45 דק׳" לפחות משעה. */
+/** "2:40 שע׳" לשעות, "45 דק׳" לפחות משעה. */
 function gapText(seconds: number): string {
   const h = Math.floor(seconds / 3600);
   const m = Math.round((seconds % 3600) / 60);
@@ -34,15 +39,53 @@ function minutesText(seconds: number): string {
 }
 
 export function RhythmBar({
+  babyId,
   events,
+  timeZone,
   hidden = false,
+  enabled = true,
 }: {
+  babyId: string;
+  /** הרישומים שעל המסך — חיים, כולל רישום שזה עתה נוסף */
   events: EventRow[];
+  timeZone: string;
   /** מוסתר כשטיימר האכלה רץ */
   hidden?: boolean;
+  /** כבוי במצב תצוגה, שבו אין מסד נתונים לשאול */
+  enabled?: boolean;
 }) {
   const now = useNow();
-  const rhythm = feedRhythm(events);
+  const [history, setHistory] = useState<number[]>([]);
+
+  // היסטוריה עמוקה יותר ממה שהעמוד טוען, אחרי הציור הראשון. בלעדיה
+  // אין מספיק דגימות בכל חלק של היממה; אם היא נכשלת פשוט מסתמכים
+  // על מה שכבר על המסך
+  useEffect(() => {
+    if (!enabled) return;
+    let active = true;
+
+    fetchFeedTimes(babyId)
+      .then((times) => {
+        if (active) setHistory(times);
+      })
+      .catch(() => {});
+
+    return () => {
+      active = false;
+    };
+  }, [babyId, enabled]);
+
+  // איחוד: ההיסטוריה נותנת עומק, והרישומים שעל המסך נותנים את הרגע
+  // האחרון — כולל רישום שנוסף עכשיו וטרם הגיע לשאילתה.
+  //
+  // ממוזכר כי החישוב מפרק כמאה חותמות זמן דרך Intl, והרכיב מתרנדר
+  // מחדש בכל דקה ובכל רישום חדש — בלי זה זו עבודה חוזרת על לא כלום
+  const rhythm = useMemo(() => {
+    const times = [...new Set([...feedTimes(events), ...history])].sort(
+      (a, b) => b - a,
+    );
+    return feedRhythm(times, timeZone);
+  }, [events, history, timeZone]);
 
   // עד שהשעון של הדפדפן זמין אין מה להשוות אליו, והשרת לא אמור
   // לרנדר כאן טקסט שישתנה מיד אחרי ההידרציה
@@ -88,10 +131,20 @@ export function RhythmBar({
           </span>
         ) : null}
       </div>
+
       {/* הבסיס לתחזית, בשורה שנייה — מי שרוצה לדעת כמה לסמוך עליה
-          מוצא אותה, ומי שרק רוצה את השעה לא צריך לקרוא אותה */}
+          מוצא אותה, ומי שרק רוצה את השעה לא צריך לקרוא אותה.
+          כשהמרווח של השעה הזו שונה מהממוצע הכללי מוצגים שניהם, אחרת
+          "כל 4:50 בלילה" נראה כאילו משהו השתבש */}
       <p className="tnum mt-0.5 ps-6 text-[0.75rem] opacity-75">
         בדרך כלל כל {gapText(rhythm.gapSec)}
+        {rhythm.timeOfDay ? ` ${rhythm.timeOfDay}` : ""}
+        {/* ההשוואה מוצגת רק כשהפער משמעותי — אחרת "2:30 בבוקר ·
+            2:28 בממוצע" הוא רעש שמסיח מהמספר עצמו */}
+        {rhythm.timeOfDay &&
+        Math.abs(rhythm.gapSec - rhythm.overallGapSec) >= 20 * 60
+          ? ` · ${gapText(rhythm.overallGapSec)} בממוצע היממה`
+          : ""}
       </p>
     </div>
   );

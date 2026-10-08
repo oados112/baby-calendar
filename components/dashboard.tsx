@@ -379,7 +379,13 @@ export function Dashboard({
 
         {/* אחרי הטיימרים ולפני הכרטיסים: זה לא מצב נוכחי אלא תחזית,
             ובזמן הנקה אין טעם לנבא את ההאכלה הבאה */}
-        <RhythmBar events={events} hidden={breastRunning} />
+        <RhythmBar
+          babyId={baby.id}
+          events={events}
+          timeZone={timeZone}
+          hidden={breastRunning}
+          enabled={!demo}
+        />
 
         <section aria-label="מצב נוכחי" className="grid grid-cols-3 gap-2.5">
           <SinceCard
