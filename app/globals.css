@@ -7,75 +7,82 @@
    ========================================================================== */
 
 :root {
-  /* --- משטחים --- */
-  --surface-base: #faf9f7; /* רקע הדף */
+  /* --- משטחים ---
+     גוון ורדרד עדין מאוד ברקע. לא "ורוד" אלא לבן חם שנוטה לוורוד —
+     מספיק כדי שהמסך לא ירגיש קליני, מעט מספיק כדי שהתוכן ישלוט. */
+  --surface-base: #fdf7fa; /* רקע הדף */
   --surface-card: #ffffff; /* כרטיסים */
   --surface-raised: #ffffff; /* תפריטים צפים, bottom sheet */
-  --surface-sunken: #f1efec; /* שדות קלט, אזורים שקועים */
-  --surface-overlay: rgb(28 25 23 / 0.45); /* שכבת כהות מאחורי חלוניות */
+  --surface-sunken: #f7ecf1; /* שדות קלט, אזורים שקועים */
+  --surface-overlay: rgb(45 26 35 / 0.45); /* שכבת כהות מאחורי חלוניות */
 
-  /* --- טקסט --- */
-  /* סולם הטקסט. כל ארבעת הגוונים עוברים ניגודיות AA מול הרקע —
-     גם "faint", שנשא קודם ‎#a8a29e ונתן כ-2.4:1 בלבד. טקסט עזר בגודל
-     12px הוא בדיוק מה שאדם עייף מתקשה לקרוא, אז הוא לא יכול להיות
-     הכי חלש. */
-  --text-strong: #1c1917; /* כותרות ומספרים גדולים */
-  --text-default: #44403c; /* גוף */
-  --text-muted: #57534e; /* משני */
-  --text-faint: #736c66; /* רמז, placeholder */
+  /* רקע הכותרת: מעבר רך שנותן עומק בלי להעמיס */
+  --surface-hero: linear-gradient(140deg, #fde8f1 0%, #fdf0f4 45%, #fdf7fa 100%);
+
+  /* --- טקסט ---
+     ארבע רמות, כולן עוברות ניגודיות AA מול הרקע. גם "faint": טקסט עזר
+     בגודל 12px הוא בדיוק מה שאדם עייף מתקשה לקרוא. */
+  --text-strong: #241a1f; /* כותרות ומספרים גדולים */
+  --text-default: #4a3a41; /* גוף */
+  --text-muted: #5d4a52; /* משני */
+  --text-faint: #7a656e; /* רמז, placeholder */
   --text-on-accent: #ffffff;
 
   /* --- גבולות --- */
-  --border-subtle: #e7e5e4;
-  --border-default: #d6d3d1;
-  --border-strong: #a8a29e;
+  --border-subtle: #f2e2ea;
+  --border-default: #e4cedb;
+  --border-strong: #c9a7b8;
 
-  /* --- צבע מותג / פעולה ראשית --- */
-  --accent: #0d7d75;
-  --accent-hover: #0a655f;
-  --accent-soft: #d6f0ed;
-  --accent-text: #0a5a55;
+  /* --- צבע מותג ---
+     ורוד-פטל עמוק. נשי בבירור, אבל רווי ועמוק מספיק כדי שטקסט לבן
+     עליו יעבור ניגודיות, ולא "ורוד תינוקות" שנראה דהוי על מסך בהיר. */
+  --accent: #b4316b;
+  --accent-hover: #9c2a5f;
+  --accent-soft: #fce4ee;
+  --accent-text: #9c2a5f;
 
   /* --- צבעי סטטוס (כמה זמן עבר) --- */
   --status-ok: #15803d;
-  --status-ok-soft: #dcfce7;
-  --status-due: #b45309;
-  --status-due-soft: #fef3c7;
+  --status-ok-soft: #e3f6e9;
+  --status-due: #9a5b00;
+  --status-due-soft: #fdf0d9;
   --status-late: #b91c1c;
-  --status-late-soft: #fee2e2;
+  --status-late-soft: #fde8e8;
 
   /* --- צבע לכל סוג אירוע (עקביות בין מסכים וגרפים) --- */
   --ev-feed: #d97706; /* האכלה — ענבר */
-  --ev-feed-soft: #fef3c7;
+  --ev-feed-soft: #fdf0dc;
   --ev-sleep: #4f46e5; /* שינה — אינדיגו */
-  --ev-sleep-soft: #e0e7ff;
+  --ev-sleep-soft: #e8e7fd;
   --ev-diaper: #0891b2; /* חיתול — טורקיז */
-  --ev-diaper-soft: #cffafe;
+  --ev-diaper-soft: #ddf4fa;
   --ev-health: #be123c; /* בריאות — ורוד עמוק */
-  --ev-health-soft: #ffe4e6;
+  --ev-health-soft: #fde5ea;
   --ev-growth: #7c3aed; /* גדילה — סגול */
-  --ev-growth-soft: #ede9fe;
+  --ev-growth-soft: #efe8fd;
   --ev-activity: #047857; /* פעילות — ירוק */
-  --ev-activity-soft: #d7f0e6;
-  --ev-note: #57534e; /* הערה — אפור */
-  --ev-note-soft: #f5f5f4;
+  --ev-activity-soft: #ddf2e9;
+  --ev-note: #6b5a62; /* הערה — אפור חמים */
+  --ev-note-soft: #f5eef1;
 
-  /* --- צללים --- */
-  --shadow-sm: 0 1px 2px rgb(28 25 23 / 0.06);
-  --shadow-md: 0 2px 8px rgb(28 25 23 / 0.08);
-  --shadow-lg: 0 8px 28px rgb(28 25 23 / 0.12);
-  --shadow-sheet: 0 -8px 32px rgb(28 25 23 / 0.16);
+  /* --- צללים ---
+     שכבתיים ובגוון חם, לא אפור. צל אפור על רקע ורדרד נראה מלוכלך. */
+  --shadow-sm: 0 1px 2px rgb(93 54 72 / 0.06), 0 1px 1px rgb(93 54 72 / 0.04);
+  --shadow-md: 0 2px 6px rgb(93 54 72 / 0.07), 0 6px 16px rgb(93 54 72 / 0.06);
+  --shadow-lg: 0 4px 12px rgb(93 54 72 / 0.08), 0 16px 36px rgb(93 54 72 / 0.12);
+  --shadow-sheet: 0 -6px 24px rgb(93 54 72 / 0.14);
 
   /* --- מידות מגע --- */
   --tap-min: 3rem; /* 48px — מינימום מוחלט */
   --tap-comfy: 3.5rem; /* 56px — כפתורי רישום */
   --tap-hero: 4.5rem; /* 72px — פעולה ראשית במסך הבית */
 
-  /* --- רדיוסים --- */
-  --radius-sm: 0.5rem;
-  --radius-md: 0.875rem;
-  --radius-lg: 1.25rem;
-  --radius-xl: 1.75rem;
+  /* --- רדיוסים ---
+     נדיבים יותר מקודם. פינות רכות הן חצי מהתחושה ה"נעימה" של מסך. */
+  --radius-sm: 0.625rem;
+  --radius-md: 1rem;
+  --radius-lg: 1.375rem;
+  --radius-xl: 1.875rem;
   --radius-full: 999px;
 
   /* --- תנועה --- */

@@ -23,7 +23,7 @@ export function PageNav() {
   return (
     <nav
       aria-label="ניווט"
-      className="mx-4 mb-4 flex gap-1 rounded-lg bg-surface-sunken p-1"
+      className="mx-4 mb-4 flex gap-1 rounded-full bg-surface-card p-1 shadow-[var(--shadow-sm)]"
     >
       {TABS.map((tab) => {
         const active = pathname === tab.href;
@@ -35,9 +35,9 @@ export function PageNav() {
             prefetch
             aria-current={active ? "page" : undefined}
             className={[
-              "flex min-h-tap flex-1 items-center justify-center rounded-md text-[0.875rem] transition-colors duration-150",
+              "flex min-h-tap flex-1 items-center justify-center rounded-full text-[0.875rem] transition-colors duration-150",
               active
-                ? "bg-surface-card font-semibold text-strong shadow-[var(--shadow-sm)]"
+                ? "bg-accent font-semibold text-on-accent"
                 : "text-muted",
             ].join(" ")}
           >

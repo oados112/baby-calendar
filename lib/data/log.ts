@@ -1,6 +1,13 @@
 "use client";
 
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import {
+  closeSegment,
+  startSegment,
+  totals,
+  type NursingSegment,
+  type NursingSide,
+} from "@/lib/nursing";
 import type { ActiveTimerRow, EventRow, EventType, Json } from "@/types/db";
 
 /**
@@ -71,7 +78,12 @@ export async function startTimer(
   side?: "left" | "right",
 ): Promise<ActiveTimerRow> {
   const supabase = getSupabaseBrowserClient();
-  const now = new Date().toISOString();
+  const at = new Date();
+  const now = at.toISOString();
+
+  const segments: NursingSegment[] = side
+    ? [{ side, from: now }]
+    : [];
 
   const { data, error } = await supabase
     .from("active_timers")
@@ -84,6 +96,8 @@ export async function startTimer(
         segment_started_at: now,
         left_sec: 0,
         right_sec: 0,
+        segments: segments as unknown as Json,
+        paused_at: null,
         started_by: userId,
       },
       { onConflict: "baby_id,type" },
@@ -93,6 +107,47 @@ export async function startTimer(
 
   if (error) throw new Error(error.message);
   return data;
+}
+
+/**
+ * עדכון מקטעי ההנקה.
+ *
+ * כל שלוש הפעולות — השהיה, המשך והחלפת צד — הן אותו דבר: סוגרים את
+ * הקטע הנוכחי, ואולי פותחים חדש. לכן יש כאן פונקציה אחת ולא שלוש.
+ */
+export function nextSegmentState(
+  segments: NursingSegment[],
+  action: { type: "pause" } | { type: "resume"; side: NursingSide } | { type: "switch"; side: NursingSide },
+  at: Date = new Date(),
+): Partial<ActiveTimerRow> {
+  const next =
+    action.type === "pause"
+      ? closeSegment(segments, at)
+      : startSegment(segments, action.side, at);
+
+  const sums = totals(next, at);
+
+  return {
+    segments: next as unknown as Json,
+    side: action.type === "pause" ? null : action.side,
+    paused_at: action.type === "pause" ? at.toISOString() : null,
+    segment_started_at: at.toISOString(),
+    left_sec: sums.left,
+    right_sec: sums.right,
+  };
+}
+
+export async function updateTimer(
+  timerId: string,
+  patch: Partial<ActiveTimerRow>,
+): Promise<void> {
+  const supabase = getSupabaseBrowserClient();
+  const { error } = await supabase
+    .from("active_timers")
+    .update(patch)
+    .eq("id", timerId);
+
+  if (error) throw new Error(error.message);
 }
 
 export async function cancelTimer(babyId: string, type: EventType): Promise<void> {

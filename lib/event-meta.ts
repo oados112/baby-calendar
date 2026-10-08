@@ -218,9 +218,24 @@ export function summarizeEvent(type: EventType, data: unknown): string | null {
     case "feed_breast": {
       const l = num("left_sec") ?? 0;
       const r = num("right_sec") ?? 0;
+
+      // שעת ההתחלה של כל צד — זה מה שמאפשר לדעת אחר כך מתי בדיוק
+      // עברה לשד השני, ולא רק כמה זמן הייתה בכל אחד
+      const clock = (key: string) => {
+        const value = d[key];
+        if (typeof value !== "string") return "";
+        const at = new Date(value);
+        if (Number.isNaN(at.getTime())) return "";
+        return ` (${at.getHours()}:${String(at.getMinutes()).padStart(2, "0")})`;
+      };
+
       const parts: string[] = [];
-      if (l) parts.push(`שמאל ${Math.round(l / 60)}′`);
-      if (r) parts.push(`ימין ${Math.round(r / 60)}′`);
+      if (r) parts.push(`ימין ${Math.round(r / 60)}′${clock("right_started_at")}`);
+      if (l) parts.push(`שמאל ${Math.round(l / 60)}′${clock("left_started_at")}`);
+
+      const paused = num("paused_sec") ?? 0;
+      if (paused >= 60) parts.push(`הפסקה ${Math.round(paused / 60)}′`);
+
       return parts.join(" · ") || null;
     }
     case "diaper": {

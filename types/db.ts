@@ -104,6 +104,8 @@ export type ActiveTimerRow = {
   started_at: string;
   segment_started_at: string;
   paused_at: string | null;
+  /** מקטעי ההנקה: [{side, from, to}] */
+  segments: Json;
   started_by: string;
 }
 

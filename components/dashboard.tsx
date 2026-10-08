@@ -8,6 +8,7 @@ import { TimerPanel } from "@/components/timer-panel";
 import { PageNav } from "@/components/page-nav";
 import { SyncBanner } from "@/components/sync-banner";
 import { DueMedications } from "@/components/due-medications";
+import { RefreshButton } from "@/components/refresh-button";
 import { BabySwitcher } from "@/components/baby-switcher";
 import { FormForType } from "@/components/log-forms";
 import {
@@ -312,6 +313,7 @@ export function Dashboard({
       started_at: now,
       segment_started_at: now,
       paused_at: null,
+      segments: side ? [{ side, from: now }] : [],
       started_by: currentUserId ?? "",
     });
 
@@ -325,13 +327,17 @@ export function Dashboard({
 
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-lg flex-col">
-      <header className="flex items-center justify-between gap-3 px-4 pt-[calc(1rem+var(--safe-top))] pb-3">
-        <div className="flex items-center gap-3">
-          <div className="grid size-11 place-items-center rounded-full bg-accent-soft text-lg font-semibold text-accent-text">
+      {/* כותרת עם מעבר צבע רך — נותן עומק למסך בלי להוסיף לו רעש */}
+      <header
+        className="flex items-center justify-between gap-3 rounded-b-[2rem] px-4 pt-[calc(1.25rem+var(--safe-top))] pb-6"
+        style={{ background: "var(--surface-hero)" }}
+      >
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="grid size-12 shrink-0 place-items-center rounded-full bg-surface-card text-xl font-semibold text-accent-text shadow-[var(--shadow-sm)]">
             {initial ?? <IconBaby className="size-6" />}
           </div>
-          <div>
-            <h1 className="text-lg leading-tight font-semibold text-strong">
+          <div className="min-w-0">
+            <h1 className="truncate text-xl leading-tight font-semibold tracking-tight text-strong">
               {babyDisplayName(baby.name)}
             </h1>
             <p className="text-[0.8125rem] text-muted" suppressHydrationWarning>
@@ -341,10 +347,15 @@ export function Dashboard({
           </div>
         </div>
 
-        <BabySwitcher babies={siblings} selectedId={baby.id} />
+        <div className="flex shrink-0 items-center gap-2">
+          <BabySwitcher babies={siblings} selectedId={baby.id} />
+          <RefreshButton />
+        </div>
       </header>
 
-      <PageNav />
+      <div className="-mt-3">
+        <PageNav />
+      </div>
       {demo ? null : <SyncBanner userId={currentUserId ?? ""} />}
 
       <main id="main" className="flex-1 px-4 pb-32">
@@ -409,7 +420,7 @@ export function Dashboard({
         </section>
 
         <section aria-label="רישומים" className="mt-7">
-          <h2 className="mb-2.5 text-[0.9375rem] font-semibold text-strong">
+          <h2 className="mb-3 text-[1.0625rem] font-semibold tracking-tight text-strong">
             הרישומים
           </h2>
 

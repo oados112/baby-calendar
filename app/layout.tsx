@@ -30,10 +30,8 @@ export const viewport: Viewport = {
   // מאפשר הגדלה — נגישות. לא נועלים את הזום.
   maximumScale: 5,
   viewportFit: "cover",
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#faf9f7" },
-    { media: "(prefers-color-scheme: dark)", color: "#1c1917" },
-  ],
+  // צבע אחד: האתר קבוע על ערכה בהירה, אז אין טעם בשתי אפשרויות
+  themeColor: "#fde8f1",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
