@@ -298,7 +298,10 @@ function Row({
         </div>
 
         <span
-          className={`order-3 grid size-9 shrink-0 place-items-center rounded-full ${colors.soft} ${colors.text} ring-4 ring-[var(--surface-base)]`}
+          // relative: הפס האנכי של הציר ממוקם absolute, ולכן נצבע מעל
+          // תוכן רגיל — הוא עבר דרך כל העיגולים. ברגע שגם העיגול ממוקם,
+          // סדר ה-DOM מכריע, הוא נצבע אחרי הפס, והטבעת מסתירה אותו.
+          className={`order-3 relative grid size-9 shrink-0 place-items-center rounded-full ${colors.soft} ${colors.text} ring-4 ring-[var(--surface-base)]`}
         >
           <EventIcon type={event.type} />
         </span>

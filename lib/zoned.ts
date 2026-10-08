@@ -121,3 +121,46 @@ export function longDate(key: string): string {
   const weekday = WEEKDAYS_FULL[new Date(Date.UTC(y, m - 1, d)).getUTCDay()];
   return `יום ${weekday}, ${d} ${MONTHS[m - 1]}`;
 }
+
+const MONTH_NAMES = [
+  "ינואר", "פברואר", "מרץ", "אפריל", "מאי", "יוני",
+  "יולי", "אוגוסט", "ספטמבר", "אוקטובר", "נובמבר", "דצמבר",
+];
+
+/** "ספטמבר 2026" */
+export function monthLabel(key: string): string {
+  const [y, m] = key.split("-").map(Number);
+  return `${MONTH_NAMES[m - 1]} ${y}`;
+}
+
+/** אותו יום בחודש אחר. נצמד לסוף החודש כשהיום לא קיים בו. */
+export function shiftMonthKey(key: string, months: number): string {
+  const [y, m, d] = key.split("-").map(Number);
+  const lastDay = new Date(Date.UTC(y, m + months, 0)).getUTCDate();
+  const shifted = new Date(Date.UTC(y, m - 1 + months, Math.min(d, lastDay)));
+  return shifted.toISOString().slice(0, 10);
+}
+
+/**
+ * ימי החודש של המפתח, מרופדים לשבועות שלמים מראשון עד שבת.
+ * `null` הוא משבצת ריקה לפני תחילת החודש או אחרי סופו — כך הלוח נשאר
+ * רשת של שבע עמודות בלי חישובי היסט בצד הרכיב.
+ */
+export function monthDays(key: string): (string | null)[] {
+  const [y, m] = key.split("-").map(Number);
+  const leading = new Date(Date.UTC(y, m - 1, 1)).getUTCDay();
+  const length = new Date(Date.UTC(y, m, 0)).getUTCDate();
+
+  const cells: (string | null)[] = Array.from({ length: leading }, () => null);
+  for (let d = 1; d <= length; d++) {
+    cells.push(`${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`);
+  }
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  return cells;
+}
+
+/** "2026-09" — לצורך השוואת חודשים. */
+export function monthOf(key: string): string {
+  return key.slice(0, 7);
+}

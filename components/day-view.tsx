@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { PageNav } from "@/components/page-nav";
 import { DayEvents } from "@/components/day-events";
+import { DayPicker } from "@/components/day-picker";
 import { StatTile } from "@/components/charts";
 import { formatHours, type DaySummary } from "@/lib/stats";
 import { longDate, shiftDayKey } from "@/lib/zoned";
@@ -21,6 +22,7 @@ export function DayView({
   memberNames,
   currentUserId,
   familyId,
+  birthDate,
 }: {
   dayKey: string;
   todayKey: string;
@@ -29,6 +31,8 @@ export function DayView({
   memberNames: Record<string, string>;
   currentUserId: string;
   familyId: string;
+  /** אין יומן לפני הלידה — תאריכים מוקדמים יותר כבויים בלוח */
+  birthDate?: string;
 }) {
   const prev = shiftDayKey(dayKey, -1);
   const next = shiftDayKey(dayKey, 1);
@@ -40,20 +44,19 @@ export function DayView({
       <PageNav />
 
       <header className="mb-4 flex items-center gap-2 px-4">
-        {/* RTL: "אחורה בזמן" הוא החץ שמצביע ימינה */}
         <Link
           href={`/journal?date=${prev}`}
           // טעינה מראש: היום הקודם מוכן ברקע עוד לפני הלחיצה
           prefetch
           aria-label="היום הקודם"
-          className="grid size-11 shrink-0 place-items-center rounded-md border border-subtle bg-surface-card text-default"
+          className="grid size-11 shrink-0 place-items-center rounded-full border border-subtle bg-surface-card text-default transition-transform duration-150 active:scale-90"
         >
-          ›
+          <Chevron direction="back" />
         </Link>
 
         <div className="flex-1 text-center">
-          <h1 className="text-[1.0625rem] font-semibold text-strong">
-            {isToday ? "היום" : longDate(dayKey)}
+          <h1>
+            <DayPicker dayKey={dayKey} todayKey={todayKey} minKey={birthDate} />
           </h1>
           {isToday ? (
             <p className="text-[0.8125rem] text-muted">{longDate(dayKey)}</p>
@@ -74,9 +77,9 @@ export function DayView({
             href={`/journal?date=${next}`}
             prefetch
             aria-label="היום הבא"
-            className="grid size-11 shrink-0 place-items-center rounded-md border border-subtle bg-surface-card text-default"
+            className="grid size-11 shrink-0 place-items-center rounded-full border border-subtle bg-surface-card text-default transition-transform duration-150 active:scale-90"
           >
-            ‹
+            <Chevron direction="forward" />
           </Link>
         )}
       </header>
@@ -128,5 +131,29 @@ export function DayView({
         </section>
       </main>
     </div>
+  );
+}
+
+/**
+ * חץ מעבר בין ימים.
+ *
+ * SVG ולא התו "›": תווי הסוגר האלה מראה-תמונה בכיוון RTL, כלומר החץ
+ * של "היום הקודם" הוצג הפוך. SVG לא מתהפך, והכיוון נשאר מה שנכתב —
+ * ובעברית "אחורה בזמן" מצביע ימינה.
+ */
+function Chevron({ direction }: { direction: "back" | "forward" }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+      className="size-4"
+    >
+      <path d={direction === "back" ? "m9 6 6 6-6 6" : "m15 6-6 6 6 6"} />
+    </svg>
   );
 }
