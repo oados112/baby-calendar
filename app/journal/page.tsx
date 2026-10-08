@@ -69,6 +69,7 @@ export default async function JournalPage({ searchParams }: PageProps<"/journal"
       memberNames={memberNames}
       currentUserId={context.member.user_id}
       familyId={context.member.family_id}
+      babyId={baby.id}
       birthDate={baby.birth_date}
     />
   );

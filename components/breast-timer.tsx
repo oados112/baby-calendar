@@ -12,7 +12,14 @@ import {
   totals,
   type NursingSide,
 } from "@/lib/nursing";
-import { cancelTimer, nextSegmentState, updateTimer, type LogInput } from "@/lib/data/log";
+import {
+  cancelTimer,
+  nextSegmentState,
+  shiftedStartState,
+  updateTimer,
+  type LogInput,
+} from "@/lib/data/log";
+import { TimerStartSheet } from "@/components/timer-start-sheet";
 import { isPending } from "@/lib/use-live-data";
 import type { ActiveTimerRow } from "@/types/db";
 
@@ -55,6 +62,7 @@ export function BreastTimer({
   patchTimer: (id: string, patch: Partial<ActiveTimerRow>) => { rollback: () => void };
   onError: (m: string) => void;
 }) {
+  const [editingStart, setEditingStart] = useState(false);
   const segments = parseSegments(timer.segments);
   const paused = segmentsPaused(segments);
   const current = openSegment(segments);
@@ -65,20 +73,23 @@ export function BreastTimer({
   const sums = totals(segments);
 
   /** כל שינוי מוחל על המסך מיד, והרשת מתיישרת אחריו. */
-  function apply(
-    action:
-      | { type: "pause" }
-      | { type: "resume"; side: NursingSide }
-      | { type: "switch"; side: NursingSide },
-  ) {
+  function push(patch: Partial<ActiveTimerRow>) {
     if (pending) return;
-    const patch = nextSegmentState(segments, action);
     const { rollback } = patchTimer(timer.id, patch);
 
     updateTimer(timer.id, patch).catch((e: unknown) => {
       rollback();
       onError(e instanceof Error ? e.message : "העדכון נכשל");
     });
+  }
+
+  function apply(
+    action:
+      | { type: "pause" }
+      | { type: "resume"; side: NursingSide }
+      | { type: "switch"; side: NursingSide },
+  ) {
+    push(nextSegmentState(segments, action));
   }
 
   function stop(save: boolean) {
@@ -120,11 +131,14 @@ export function BreastTimer({
           </div>
         </div>
 
-        <span
-          className={`tnum text-3xl font-semibold tabular-nums ${paused ? "text-muted" : "text-strong"}`}
+        {/* לחיצה על הספירה מתקנת את שעת ההתחלה — המקום שבו מחפשים אותה */}
+        <button
+          onClick={() => setEditingStart(true)}
+          aria-label="תיקון שעת ההתחלה"
+          className={`tnum rounded-md px-1 text-3xl font-semibold tabular-nums transition-colors duration-150 active:bg-surface-card ${paused ? "text-muted" : "text-strong"}`}
         >
           {formatDuration(sums.total)}
-        </span>
+        </button>
       </div>
 
       {/* סכום וזמן התחלה לכל צד — זה מה שחסר קודם */}
@@ -234,6 +248,14 @@ export function BreastTimer({
           ביטול
         </Button>
       </div>
+
+      {editingStart ? (
+        <TimerStartSheet
+          startedAt={timer.started_at}
+          onApply={(next) => push(shiftedStartState(timer, next))}
+          onClose={() => setEditingStart(false)}
+        />
+      ) : null}
     </div>
   );
 }

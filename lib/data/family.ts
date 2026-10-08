@@ -224,3 +224,27 @@ export async function getMedicationPlans(
 
   return data ?? [];
 }
+
+/**
+ * כל הרישומים שנושאים תמונה, מהחדש לישן.
+ *
+ * רק העמודות הדרושות לגלריה — בשנה שנייה אלה יכולות להיות מאות שורות,
+ * ואין סיבה להוריד `data` של כל אחת כדי להציג רשת תמונות.
+ */
+export async function getPhotoEvents(
+  babyId: string,
+  limit = 180,
+): Promise<Pick<EventRow, "id" | "type" | "started_at" | "note" | "photo_path">[]> {
+  const supabase = await getSupabaseServerClient();
+
+  const { data } = await supabase
+    .from("events")
+    .select("id, type, started_at, note, photo_path")
+    .eq("baby_id", babyId)
+    .is("deleted_at", null)
+    .not("photo_path", "is", null)
+    .order("started_at", { ascending: false })
+    .limit(limit);
+
+  return data ?? [];
+}

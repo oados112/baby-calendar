@@ -263,6 +263,8 @@ export function DiaperForm({ babyId, familyId, submit, initial, onDone }: FormPr
 
   const [kind, setKind] = useState(initialKind);
   const [color, setColor] = useState<string | null>(str(d, "color"));
+  const [amount, setAmount] = useState<string | null>(str(d, "amount"));
+  const [texture, setTexture] = useState<string | null>(str(d, "texture"));
   const [rash, setRash] = useState(Boolean(d.rash));
   const [at, setAt] = useState(startOf(initial));
   const [note, setNote] = useState(initial?.note ?? "");
@@ -284,7 +286,11 @@ export function DiaperForm({ babyId, familyId, submit, initial, onDone }: FormPr
           data: {
             pee: kind === "pee" || kind === "both",
             poo: hasPoo,
+            // שדות הקקי נשמרים רק כשהיה קקי, אחרת ערך ישן היה נשאר
+            // תלוי באוויר אחרי שינוי הסוג בעריכה
             color: hasPoo ? color : null,
+            amount: hasPoo ? amount : null,
+            texture: hasPoo ? texture : null,
             rash,
           },
           photoPath: photo.photoPath
@@ -304,18 +310,46 @@ export function DiaperForm({ babyId, familyId, submit, initial, onDone }: FormPr
         ]}
       />
 
+      {/* שלוש השורות האלה הן מידע רפואי אמיתי בגיל הזה — צבע מעיד על
+          צהבת או על דם, מרקם על עיכול, וכמות על האם היא אוכלת מספיק.
+          כולן אופציונליות: מי שלא בוחר, לא נחסם. */}
       {hasPoo ? (
-        <ChoiceRow
-          label="צבע"
-          value={color}
-          onChange={setColor}
-          options={[
-            { value: "yellow", label: "צהוב" },
-            { value: "green", label: "ירוק" },
-            { value: "brown", label: "חום" },
-            { value: "dark", label: "כהה" },
-          ]}
-        />
+        <>
+          <ChoiceRow
+            label="כמות"
+            value={amount}
+            onChange={setAmount}
+            options={[
+              { value: "little", label: "קצת" },
+              { value: "medium", label: "בינוני" },
+              { value: "lot", label: "הרבה" },
+            ]}
+          />
+
+          <ChoiceRow
+            label="צבע"
+            value={color}
+            onChange={setColor}
+            options={[
+              { value: "yellow", label: "צהוב" },
+              { value: "green", label: "ירוק" },
+              { value: "brown", label: "חום" },
+              { value: "dark", label: "כהה" },
+            ]}
+          />
+
+          <ChoiceRow
+            label="מרקם"
+            value={texture}
+            onChange={setTexture}
+            options={[
+              { value: "soft", label: "רך" },
+              { value: "watery", label: "מימי" },
+              { value: "seedy", label: "גרגירי" },
+              { value: "hard", label: "קשה" },
+            ]}
+          />
+        </>
       ) : null}
 
       <label className="flex min-h-tap items-center gap-3 rounded-md border border-line bg-surface-card px-3">

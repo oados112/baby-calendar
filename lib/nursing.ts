@@ -133,3 +133,23 @@ export function toEventData(
     segments: closed,
   };
 }
+
+/**
+ * מזיז את כל הקטעים באותו הפרש.
+ *
+ * משמש כשמגלים שהטיימר הופעל באיחור: הסשן כולו התחיל מוקדם יותר, אבל
+ * המבנה שלו — מתי הוחלף צד, איפה הייתה הפסקה — נכון כמו שהוא. הזזה
+ * אחידה שומרת עליו ומתקנת רק את נקודת האפס.
+ */
+export function shiftSegments(
+  segments: NursingSegment[],
+  deltaMs: number,
+): NursingSegment[] {
+  const move = (iso: string) => new Date(new Date(iso).getTime() + deltaMs).toISOString();
+
+  return segments.map((s) => ({
+    ...s,
+    from: move(s.from),
+    to: s.to ? move(s.to) : s.to,
+  }));
+}

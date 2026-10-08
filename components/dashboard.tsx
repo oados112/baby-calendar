@@ -9,6 +9,7 @@ import { PageNav } from "@/components/page-nav";
 import { SyncBanner } from "@/components/sync-banner";
 import { DueMedications } from "@/components/due-medications";
 import { RefreshButton } from "@/components/refresh-button";
+import { RhythmBar } from "@/components/rhythm-bar";
 import { BabySwitcher } from "@/components/baby-switcher";
 import { FormForType } from "@/components/log-forms";
 import {
@@ -375,6 +376,10 @@ export function Dashboard({
           patchTimer={patchTimer}
           onError={setToast}
         />
+
+        {/* אחרי הטיימרים ולפני הכרטיסים: זה לא מצב נוכחי אלא תחזית,
+            ובזמן הנקה אין טעם לנבא את ההאכלה הבאה */}
+        <RhythmBar events={events} hidden={breastRunning} />
 
         <section aria-label="מצב נוכחי" className="grid grid-cols-3 gap-2.5">
           <SinceCard

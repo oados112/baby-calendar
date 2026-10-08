@@ -2,6 +2,7 @@ import Link from "next/link";
 import { PageNav } from "@/components/page-nav";
 import { DayEvents } from "@/components/day-events";
 import { DayPicker } from "@/components/day-picker";
+import { JournalSearchButton } from "@/components/journal-search";
 import { StatTile } from "@/components/charts";
 import { formatHours, type DaySummary } from "@/lib/stats";
 import { longDate, shiftDayKey } from "@/lib/zoned";
@@ -22,6 +23,7 @@ export function DayView({
   memberNames,
   currentUserId,
   familyId,
+  babyId,
   birthDate,
 }: {
   dayKey: string;
@@ -31,6 +33,8 @@ export function DayView({
   memberNames: Record<string, string>;
   currentUserId: string;
   familyId: string;
+  /** נדרש לחיפוש — הוא רץ על כל ההיסטוריה ולא רק על היום המוצג */
+  babyId?: string;
   /** אין יומן לפני הלידה — תאריכים מוקדמים יותר כבויים בלוח */
   birthDate?: string;
 }) {
@@ -117,9 +121,14 @@ export function DayView({
         </section>
 
         <section aria-label="רישומי היום" className="mt-6">
-          <h2 className="mb-2.5 text-[0.9375rem] font-semibold text-strong">
-            כל הרישומים
-          </h2>
+          <div className="mb-2.5 flex items-center justify-between gap-2">
+            <h2 className="text-[0.9375rem] font-semibold text-strong">
+              כל הרישומים
+            </h2>
+            {/* החיפוש יושב ליד הרישומים ולא בכותרת העמוד: מחפשים
+                רישום, לא תאריך, והתאריך כבר תפוס בבורר היום */}
+            {babyId ? <JournalSearchButton babyId={babyId} /> : null}
+          </div>
 
           <DayEvents
             events={events}

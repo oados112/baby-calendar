@@ -184,6 +184,27 @@ export const FAMILY_CLASSES: Record<
   },
 };
 
+/** התוויות של שדות הקקי — מקום אחד, כדי שהיומן והסיכום לרופא יקראו זהה. */
+export const DIAPER_AMOUNT: Record<string, string> = {
+  little: "קצת",
+  medium: "בינוני",
+  lot: "הרבה",
+};
+
+export const DIAPER_COLOR: Record<string, string> = {
+  yellow: "צהוב",
+  green: "ירוק",
+  brown: "חום",
+  dark: "כהה",
+};
+
+export const DIAPER_TEXTURE: Record<string, string> = {
+  soft: "רך",
+  watery: "מימי",
+  seedy: "גרגירי",
+  hard: "קשה",
+};
+
 /**
  * סיכום קריא בעברית של רישום, לפי הנתונים שלו.
  * לדוגמה: בקבוק 120 מ"ל · תמ"ל
@@ -243,6 +264,14 @@ export function summarizeEvent(type: EventType, data: unknown): string | null {
       if (d.pee) parts.push("פיפי");
       if (d.poo) parts.push("קקי");
       if (!parts.length) parts.push("יבש");
+
+      if (d.poo) {
+        const amount = DIAPER_AMOUNT[String(d.amount)];
+        const color = DIAPER_COLOR[String(d.color)];
+        const texture = DIAPER_TEXTURE[String(d.texture)];
+        parts.push(...[amount, color, texture].filter(Boolean));
+      }
+
       if (d.rash) parts.push("אדמומיות");
       return parts.join(" · ");
     }

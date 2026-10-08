@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui";
 import { IconSleep, IconStop } from "@/components/icons";
 import { formatDuration } from "@/lib/time";
-import { cancelTimer, type LogInput } from "@/lib/data/log";
+import { cancelTimer, shiftedStartState, updateTimer, type LogInput } from "@/lib/data/log";
+import { TimerStartSheet } from "@/components/timer-start-sheet";
 import { BreastTimer } from "@/components/breast-timer";
 import { isPending } from "@/lib/use-live-data";
 import type { ActiveTimerRow } from "@/types/db";
@@ -72,6 +73,7 @@ export function TimerPanel({
           timer={sleep}
           submit={submit}
           removeTimer={removeTimer}
+          patchTimer={patchTimer}
           onError={onError}
         />
       ) : null}
@@ -84,17 +86,32 @@ function SleepTimer({
   timer,
   submit,
   removeTimer,
+  patchTimer,
   onError,
 }: {
   babyId: string;
   timer: ActiveTimerRow;
   submit: (input: LogInput) => void;
   removeTimer: (id: string) => { restore: () => void };
+  patchTimer: (id: string, patch: Partial<ActiveTimerRow>) => { rollback: () => void };
   onError: (m: string) => void;
 }) {
   useSeconds(true);
+  const [editingStart, setEditingStart] = useState(false);
   const pending = isPending(timer.id);
   const total = elapsedSeconds(timer.started_at);
+
+  /** תיקון שעת ההירדמות — נרשם לרוב אחרי שהיא כבר נרדמה. */
+  function shiftStart(next: Date) {
+    if (pending) return;
+    const patch = shiftedStartState(timer, next);
+    const { rollback } = patchTimer(timer.id, patch);
+
+    updateTimer(timer.id, patch).catch((e: unknown) => {
+      rollback();
+      onError(e instanceof Error ? e.message : "העדכון נכשל");
+    });
+  }
 
   function stop(save: boolean) {
     if (save) {
@@ -122,9 +139,13 @@ function SleepTimer({
           </span>
           <span className="text-[0.875rem] font-medium text-strong">ישן/ה עכשיו</span>
         </div>
-        <span className="tnum text-2xl font-semibold text-strong">
+        <button
+          onClick={() => setEditingStart(true)}
+          aria-label="תיקון שעת ההירדמות"
+          className="tnum rounded-md px-1 text-2xl font-semibold text-strong transition-colors duration-150 active:bg-surface-card"
+        >
           {formatDuration(total)}
-        </span>
+        </button>
       </div>
 
       <div className="mt-2.5 flex gap-2">
@@ -145,6 +166,14 @@ function SleepTimer({
           ביטול
         </Button>
       </div>
+
+      {editingStart ? (
+        <TimerStartSheet
+          startedAt={timer.started_at}
+          onApply={shiftStart}
+          onClose={() => setEditingStart(false)}
+        />
+      ) : null}
     </div>
   );
 }

@@ -1,4 +1,10 @@
-import { EVENT_META, summarizeEvent } from "@/lib/event-meta";
+import {
+  DIAPER_AMOUNT,
+  DIAPER_COLOR,
+  DIAPER_TEXTURE,
+  EVENT_META,
+  summarizeEvent,
+} from "@/lib/event-meta";
 import { averageOf, formatHours, summarizeDays, type DaySummary } from "@/lib/stats";
 import { dayKey, lastDayKeys } from "@/lib/zoned";
 import type { EventRow } from "@/types/db";
@@ -21,6 +27,21 @@ export interface MedicalSummary {
   avgSleepMinutes: number;
   avgDiapers: number;
   avgBottleMl: number;
+  /**
+   * פרופיל היציאות.
+   *
+   * רופא שואל על צבע, מרקם וכמות לפני שהוא שואל על מספר — ירוק מימי
+   * וצהוב גרגירי הם שתי תשובות שונות לגמרי. `daysWithoutStool` הוא
+   * מה שמעניין בכיוון השני: עצירות.
+   */
+  stool: {
+    total: number;
+    byColor: { label: string; count: number }[];
+    byTexture: { label: string; count: number }[];
+    byAmount: { label: string; count: number }[];
+    daysWithoutStool: number;
+    rashDays: number;
+  };
   /** מדידות חום, מהחדש לישן */
   temperatures: { at: string; celsius: number }[];
   highestTemp: number | null;
@@ -105,6 +126,38 @@ export function buildMedicalSummary(
     byMedicine.set(name, current);
   }
 
+  // פילוח היציאות. רישום בלי צבע או מרקם פשוט לא נספר בפילוח ההוא,
+  // ולכן הסכומים שם יכולים להיות קטנים מ-total — וזה בסדר, אלה שדות
+  // רשות שמי שמיהר לא מילא
+  const tally = (key: string, labels: Record<string, string>) => {
+    const counts = new Map<string, number>();
+    for (const e of events) {
+      if (e.type !== "diaper") continue;
+      const d = (e.data ?? {}) as Record<string, unknown>;
+      if (!d.poo) continue;
+      const label = labels[String(d[key])];
+      if (label) counts.set(label, (counts.get(label) ?? 0) + 1);
+    }
+    return [...counts.entries()]
+      .map(([label, count]) => ({ label, count }))
+      .sort((a, b) => b.count - a.count);
+  };
+
+  const stoolDays = new Set<string>();
+  let stoolTotal = 0;
+  const rashDays = new Set<string>();
+
+  for (const e of events) {
+    if (e.type !== "diaper") continue;
+    const d = (e.data ?? {}) as Record<string, unknown>;
+    const key = dayKey(new Date(e.started_at), timeZone);
+    if (d.poo) {
+      stoolTotal += 1;
+      stoolDays.add(key);
+    }
+    if (d.rash) rashDays.add(key);
+  }
+
   const growth = events
     .filter((e) => e.type === "growth")
     .sort((a, b) => a.started_at.localeCompare(b.started_at));
@@ -140,6 +193,14 @@ export function buildMedicalSummary(
     avgSleepMinutes: averageOf(days.map((d) => d.sleepMinutes)),
     avgDiapers: averageOf(days.map((d) => d.diapers)),
     avgBottleMl: averageOf(days.map((d) => d.bottleMl)),
+    stool: {
+      total: stoolTotal,
+      byColor: tally("color", DIAPER_COLOR),
+      byTexture: tally("texture", DIAPER_TEXTURE),
+      byAmount: tally("amount", DIAPER_AMOUNT),
+      daysWithoutStool: keys.filter((k) => !stoolDays.has(k)).length,
+      rashDays: rashDays.size,
+    },
     temperatures,
     highestTemp: temperatures.length
       ? Math.max(...temperatures.map((t) => t.celsius))
@@ -191,6 +252,26 @@ export function summaryAsText(
     `שינה: ${formatHours(summary.avgSleepMinutes)} ביום בממוצע`,
     `חיתולים: ${summary.avgDiapers.toFixed(1)} ביום בממוצע`,
   );
+
+  if (summary.stool.total > 0) {
+    const counts = (entries: { label: string; count: number }[]) =>
+      entries.map((e) => `${e.label} ${e.count}`).join(" · ");
+
+    lines.push("", `יציאות: ${summary.stool.total} בתקופה`);
+    if (summary.stool.byAmount.length) {
+      lines.push(`  כמות: ${counts(summary.stool.byAmount)}`);
+    }
+    if (summary.stool.byColor.length) {
+      lines.push(`  צבע: ${counts(summary.stool.byColor)}`);
+    }
+    if (summary.stool.byTexture.length) {
+      lines.push(`  מרקם: ${counts(summary.stool.byTexture)}`);
+    }
+    if (summary.stool.daysWithoutStool > 0) {
+      lines.push(`  ימים ללא יציאה: ${summary.stool.daysWithoutStool}`);
+    }
+    lines.push("");
+  }
 
   if (summary.weightGainPerDay !== null) {
     lines.push(

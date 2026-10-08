@@ -89,6 +89,34 @@ export function DoctorView({
           <Row label="חיתולים" value={summary.avgDiapers.toFixed(1)} />
         </Block>
 
+        <Block title="יציאות">
+          {summary.stool.total === 0 ? (
+            <Empty>לא נרשמו יציאות בתקופה</Empty>
+          ) : (
+            <>
+              <Row label="סך הכל" value={String(summary.stool.total)} />
+              {summary.stool.byAmount.length > 0 ? (
+                <Row label="כמות" value={countsText(summary.stool.byAmount)} />
+              ) : null}
+              {summary.stool.byColor.length > 0 ? (
+                <Row label="צבע" value={countsText(summary.stool.byColor)} />
+              ) : null}
+              {summary.stool.byTexture.length > 0 ? (
+                <Row label="מרקם" value={countsText(summary.stool.byTexture)} />
+              ) : null}
+              {summary.stool.daysWithoutStool > 0 ? (
+                <Row
+                  label="ימים ללא יציאה"
+                  value={String(summary.stool.daysWithoutStool)}
+                />
+              ) : null}
+              {summary.stool.rashDays > 0 ? (
+                <Row label="ימים עם תפרחת" value={String(summary.stool.rashDays)} />
+              ) : null}
+            </>
+          )}
+        </Block>
+
         <Block title="גדילה">
           {summary.growth.length === 0 ? (
             <Empty>לא נרשמו מדידות בתקופה</Empty>
@@ -267,4 +295,9 @@ function Row({
 
 function Empty({ children }: { children: React.ReactNode }) {
   return <p className="py-1 text-[0.8125rem] text-muted">{children}</p>;
+}
+
+/** "צהוב 6 · ירוק 2" */
+function countsText(entries: { label: string; count: number }[]): string {
+  return entries.map((e) => `${e.label} ${e.count}`).join(" · ");
 }

@@ -13,6 +13,7 @@ import { usePathname } from "next/navigation";
 const TABS = [
   { href: "/", label: "היום" },
   { href: "/journal", label: "יומן" },
+  { href: "/gallery", label: "תמונות" },
   { href: "/stats", label: "מגמות" },
   { href: "/settings", label: "הגדרות" },
 ];
@@ -35,7 +36,7 @@ export function PageNav() {
             prefetch
             aria-current={active ? "page" : undefined}
             className={[
-              "flex min-h-tap flex-1 items-center justify-center rounded-full text-[0.875rem] transition-colors duration-150",
+              "flex min-h-tap flex-1 items-center justify-center rounded-full px-1 text-[0.8125rem] transition-colors duration-150",
               active
                 ? "bg-accent font-semibold text-on-accent"
                 : "text-muted",

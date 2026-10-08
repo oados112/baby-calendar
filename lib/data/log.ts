@@ -1,8 +1,11 @@
 "use client";
 
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { EVENT_META } from "@/lib/event-meta";
 import {
   closeSegment,
+  parseSegments,
+  shiftSegments,
   startSegment,
   totals,
   type NursingSegment,
@@ -137,6 +140,36 @@ export function nextSegmentState(
   };
 }
 
+/**
+ * תיקון שעת ההתחלה של טיימר שכבר רץ.
+ *
+ * המקרה הנפוץ ביותר: מתחילים להניק, ורק אחרי עשר דקות נזכרים ללחוץ.
+ * עד עכשיו הדרך היחידה הייתה לסיים ולערוך את הרישום.
+ *
+ * כל הסשן נדחף אחורה באותו הפרש — גם שעת ההתחלה וגם כל הקטעים — כך
+ * שהמבנה הפנימי נשמר ורק נקודת האפס זזה.
+ */
+export function shiftedStartState(
+  current: ActiveTimerRow,
+  newStart: Date,
+): Partial<ActiveTimerRow> {
+  const deltaMs = newStart.getTime() - new Date(current.started_at).getTime();
+  const segments = shiftSegments(parseSegments(current.segments), deltaMs);
+  const sums = totals(segments);
+
+  const shift = (iso: string) =>
+    new Date(new Date(iso).getTime() + deltaMs).toISOString();
+
+  return {
+    started_at: newStart.toISOString(),
+    segment_started_at: shift(current.segment_started_at),
+    paused_at: current.paused_at ? shift(current.paused_at) : null,
+    segments: segments as unknown as Json,
+    left_sec: sums.left,
+    right_sec: sums.right,
+  };
+}
+
 export async function updateTimer(
   timerId: string,
   patch: Partial<ActiveTimerRow>,
@@ -241,6 +274,44 @@ export async function fetchOlderEvents(
     .eq("baby_id", babyId)
     .is("deleted_at", null)
     .lt("started_at", before)
+    .order("started_at", { ascending: false })
+    .limit(limit);
+
+  if (error) throw new Error(error.message);
+  return data ?? [];
+}
+
+/**
+ * חיפוש ביומן.
+ *
+ * מחפש בשלושה מקומות בבת אחת: בהערה החופשית, בשם התרופה שבתוך `data`,
+ * ובסוג הרישום לפי השם העברי שלו. הכיסוי הזה הוא מה שמאפשר לשאול
+ * "מתי נתנו אקמול" ולקבל תשובה — השם הזה לא נמצא בשדה ההערה.
+ *
+ * PostgREST מפרק את הפרמטר של `or` לפי פסיקים וסוגריים, ולכן תווים
+ * כאלה בקלט מוחלפים ברווח; התו הכללי שלו הוא `*` ולא `%`.
+ */
+export async function searchEvents(
+  babyId: string,
+  term: string,
+  limit = 60,
+): Promise<EventRow[]> {
+  const clean = term.replace(/[,()*%\\]/g, " ").trim();
+  if (clean.length < 2) return [];
+
+  const conditions = [`note.ilike.*${clean}*`, `data->>name.ilike.*${clean}*`];
+
+  for (const [type, meta] of Object.entries(EVENT_META)) {
+    if (meta.label.includes(clean)) conditions.push(`type.eq.${type}`);
+  }
+
+  const supabase = getSupabaseBrowserClient();
+  const { data, error } = await supabase
+    .from("events")
+    .select("*")
+    .eq("baby_id", babyId)
+    .is("deleted_at", null)
+    .or(conditions.join(","))
     .order("started_at", { ascending: false })
     .limit(limit);
 
