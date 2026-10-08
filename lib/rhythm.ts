@@ -20,14 +20,23 @@ import type { EventRow, EventType } from "@/types/db";
  * **חציון ולא ממוצע.** לילה אחד שבו היא התעוררה פעמיים מיותרות לא
  * אמור להזיז את התחזית של שאר הלילות.
  *
- * **מרווחים קצרים מאוד מושמטים.** בקבוק השלמה מיד אחרי הנקה הוא שני
- * רישומים אבל ארוחה אחת; אילו נספר, הקצב היה נראה כפול ממה שהוא.
+ * **רישומים צמודים הם ארוחה אחת.** הנקה ומיד אחריה בקבוק השלמה, או
+ * שני צדדים שנרשמו בנפרד, הם שניים-שלושה רישומים אבל האכלה אחת. כל
+ * מה שנופל בתוך שעה מתקפל לארוחה אחת, והמרווח נמדד מסוף ארוחה אחת
+ * לתחילת הבאה — אחרת כל צמד כזה היה מוסיף מרווח של רבע שעה ומושך את
+ * כל הקצב כלפי מטה.
  */
 
 const FEED_TYPES: EventType[] = ["feed_breast", "feed_bottle", "solids"];
 
-/** מתחת לזה — השלמה לאותה ארוחה ולא ארוחה חדשה. */
-const SAME_MEAL_SEC = 20 * 60;
+/**
+ * רישומים שמרחקם קטן מזה שייכים לאותה ארוחה.
+ *
+ * שעה ולא עשרים דקות: בפועל קורה שההנקה מסתיימת, עוברת חצי שעה,
+ * ואז ניתן בקבוק השלמה. גם הנקה שנרשמה כשני רישומים נפרדים — צד
+ * וצד — נופלת כאן.
+ */
+const SAME_MEAL_SEC = 60 * 60;
 /** מעל לזה — כנראה יום שלא נרשם בו הכל, ולא מרווח אמיתי. */
 const IMPLAUSIBLE_GAP_SEC = 12 * 3600;
 /** רוחב הפעמון, בשעות. בערך מרווח אחד של האכלה ביום. */
@@ -110,6 +119,35 @@ export function feedTimes(
   return [...seen].sort((a, b) => b - a);
 }
 
+interface Meal {
+  /** הרישום המוקדם ביותר בארוחה */
+  start: number;
+  /** הרישום המאוחר ביותר בה — ממנו נמדדת ההמתנה לבאה */
+  end: number;
+}
+
+/**
+ * מקפל רישומים צמודים לארוחות.
+ *
+ * `times` מהחדש לישן, והתוצאה באותו סדר. רישום שנמצא בתוך שעה
+ * מהרישום שלפניו מצטרף לאותה ארוחה — כולל שרשרת: הנקה, עוד הנקה
+ * חצי שעה אחריה, ובקבוק חצי שעה אחריה הן ארוחה אחת של שעה.
+ */
+function toMeals(times: number[]): Meal[] {
+  const meals: Meal[] = [];
+
+  for (const t of times) {
+    const current = meals[meals.length - 1];
+    if (current && current.start - t <= SAME_MEAL_SEC * 1000) {
+      current.start = t;
+    } else {
+      meals.push({ start: t, end: t });
+    }
+  }
+
+  return meals;
+}
+
 /**
  * null כשאין מספיק היסטוריה — עדיף לא להציג כלום מאשר לנחש.
  *
@@ -118,22 +156,26 @@ export function feedTimes(
 export function feedRhythm(times: number[], timeZone: string): FeedRhythm | null {
   if (times.length < MINIMUM_OVERALL + 1) return null;
 
-  // כל מרווח נזכר יחד עם השעה שבה הוא *התחיל* — כלומר שעת ההאכלה
-  // המוקדמת מבין השתיים. זו בדיוק השאלה בזמן התחזית: אכלה ב-23:40,
-  // כמה זמן עד הבאה
+  const meals = toMeals(times);
+  if (meals.length < MINIMUM_OVERALL + 1) return null;
+
+  // המרווח נמדד מסוף ארוחה אחת לתחילת הבאה, ונזכר יחד עם השעה שבה
+  // הסתיימה הקודמת — כלומר שעת הרישום האחרון לפני ההמתנה. זו בדיוק
+  // השאלה בזמן התחזית: אכלה ב-23:40, כמה זמן עד הבאה
   const gaps: { seconds: number; hour: number }[] = [];
 
-  for (let i = 1; i < times.length; i++) {
-    const seconds = (times[i - 1] - times[i]) / 1000;
-    if (seconds < SAME_MEAL_SEC || seconds > IMPLAUSIBLE_GAP_SEC) continue;
-    gaps.push({ seconds, hour: hourOf(times[i], timeZone) });
+  for (let i = 1; i < meals.length; i++) {
+    const seconds = (meals[i - 1].start - meals[i].end) / 1000;
+    if (seconds <= 0 || seconds > IMPLAUSIBLE_GAP_SEC) continue;
+    gaps.push({ seconds, hour: hourOf(meals[i].end, timeZone) });
   }
 
   if (gaps.length < MINIMUM_OVERALL) return null;
 
   const overallGapSec = Math.round(median(gaps.map((g) => g.seconds)));
-  const lastAt = new Date(times[0]);
-  const lastHour = hourOf(times[0], timeZone);
+  // נקודת הייחוס היא הרישום האחרון בפועל, כמו בכרטיס "מאז"
+  const lastAt = new Date(meals[0].end);
+  const lastHour = hourOf(meals[0].end, timeZone);
 
   const weighted = gaps.map((g) => {
     const d = hourDistance(g.hour, lastHour);
