@@ -302,6 +302,29 @@ export function Dashboard({
     [demo, removeOptimistic, submit],
   );
 
+  /**
+   * רענון ידני.
+   *
+   * ההודעה היא כל העניין: "הכל מעודכן" ו"נוספו 2 רישומים" הן שתי
+   * תוצאות שונות של אותה לחיצה, וספינר שנעצר לא מבדיל ביניהן. השגיאה
+   * נזרקת הלאה כדי שהכפתור יידע להציג סימן של כישלון.
+   */
+  const handleRefresh = useCallback(async () => {
+    try {
+      const { added } = await refresh();
+      setToast(
+        added === 0
+          ? "הכל מעודכן"
+          : added === 1
+            ? "נוסף רישום אחד"
+            : `נוספו ${added} רישומים`,
+      );
+    } catch (e) {
+      setToast(e instanceof Error ? e.message : "הרענון נכשל");
+      throw e;
+    }
+  }, [refresh]);
+
   /** הטיימר מופיע על המסך מיד; ההרשמה בשרת ממשיכה ברקע. */
   function startTimerNow(type: "feed_breast" | "sleep", side?: "left" | "right") {
     setSheet(null);
@@ -359,7 +382,7 @@ export function Dashboard({
 
         <div className="flex shrink-0 items-center gap-2">
           <BabySwitcher babies={siblings} selectedId={baby.id} />
-          <RefreshButton onRefresh={refresh} />
+          <RefreshButton onRefresh={handleRefresh} />
         </div>
       </header>
 

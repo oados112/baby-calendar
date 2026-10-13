@@ -61,8 +61,12 @@ export interface LiveData {
    * מותקן באייפון הוא לא תמיד מגיע לשרת, והמסך נשאר כמו שהיה. כאן
    * הנתונים נשלפים ישירות מ-Supabase, ולכן זה גם מהיר יותר — רק
    * הרשימה מתעדכנת, בלי בניית דף מחדש.
+   *
+   * מחזיר כמה רישומים חדשים נכנסו, כדי שאפשר יהיה לומר למשתמש אם
+   * הגיע משהו או שהכל כבר היה מעודכן. בלי זה רענון מוצלח שלא מצא
+   * כלום נראה בדיוק כמו רענון שנכשל.
    */
-  refresh: () => Promise<void>;
+  refresh: () => Promise<{ added: number }>;
 }
 
 export function useLiveData({
@@ -77,6 +81,15 @@ export function useLiveData({
   enabled?: boolean;
 }): LiveData {
   const [events, setEvents] = useState<EventRow[]>(() => sortDesc(initialEvents));
+
+  /**
+   * המזהים שכבר הוצגו אי פעם.
+   *
+   * ref ולא נגזרת מ-`events`: `refresh` היא useCallback שתלויה רק
+   * ב-babyId, ואילו הייתה תלויה ברשימה היא הייתה נוצרת מחדש בכל
+   * רישום — ואיתה גם המאזינים לחזרה מרקע.
+   */
+  const knownEventIds = useRef(new Set(initialEvents.map((e) => e.id)));
   const [timers, setTimers] = useState<ActiveTimerRow[]>(initialTimers);
 
   // כשהשרת מביא נתונים חדשים (ניווט, רענון) — מתיישרים אליהם,
@@ -90,6 +103,10 @@ export function useLiveData({
       return sortDesc([...initialEvents, ...pending]);
     });
   }, [initialEvents]);
+
+  useEffect(() => {
+    for (const e of events) knownEventIds.current.add(e.id);
+  }, [events]);
 
   const lastServerTimers = useRef(initialTimers);
   useEffect(() => {
@@ -203,12 +220,18 @@ export function useLiveData({
   }, []);
 
   const refresh = useCallback(async () => {
-    if (!enabled) return;
+    if (!enabled) return { added: 0 };
 
     const [nextEvents, nextTimers] = await Promise.all([
       fetchLatestEvents(babyId),
       fetchTimers(babyId),
     ]);
+
+    // נספר מול מה שהיה על המסך לפני ההחלפה. רישום שנרשם כאן ואושר
+    // כבר קיים ברשימה, ולכן לא ייספר כ"חדש" — וזה נכון: הוא לא חדש
+    // בשביל מי שלחץ
+    const knownIds = new Set(knownEventIds.current);
+    const added = nextEvents.filter((e) => !knownIds.has(e.id)).length;
 
     // השליפה מכסה רק את העמוד האחרון. מי שגלל אחורה וטען רישומים
     // ישנים יותר לא אמור לראות אותם נעלמים בלחיצה על רענון, ולכן כל
@@ -237,6 +260,8 @@ export function useLiveData({
 
     lastServerEvents.current = nextEvents;
     lastServerTimers.current = nextTimers;
+
+    return { added };
   }, [babyId, enabled]);
 
   /**
