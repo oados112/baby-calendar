@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { formatNationalId, maskNationalId } from "@/lib/national-id";
+import { maskNationalId, normalizeNationalId } from "@/lib/national-id";
 
 /**
  * תעודת הזהות בכותרת.
@@ -54,7 +54,7 @@ export function BabyId({ value }: { value: string }) {
       aria-label={revealed ? "העתקת תעודת הזהות" : "הצגת תעודת הזהות"}
       className="tnum mt-0.5 inline-flex items-center gap-1 rounded-md text-[0.75rem] text-faint transition-colors duration-150 active:text-accent-text"
     >
-      ת״ז {revealed ? formatNationalId(value) : maskNationalId(value)}
+      ת״ז {revealed ? normalizeNationalId(value) : maskNationalId(value)}
       {copied ? <span className="text-ok">· הועתק</span> : null}
     </button>
   );

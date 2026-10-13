@@ -28,15 +28,9 @@ export function isValidNationalId(input: string): boolean {
   return sum % 10 === 0;
 }
 
-/** "123456789" → "12345678-9", כפי שהיא מודפסת בתעודה. */
-export function formatNationalId(id: string): string {
-  const clean = normalizeNationalId(id);
-  return clean.length === 9 ? `${clean.slice(0, 8)}-${clean.slice(8)}` : clean;
-}
-
-/** "•••••••-9" — מספיק כדי לזהות שהמספר נכון, בלי להציג אותו. */
+/** "••••••••9" — מספיק כדי לזהות שהמספר נכון, בלי להציג אותו. */
 export function maskNationalId(id: string): string {
   const clean = normalizeNationalId(id);
   if (clean.length !== 9) return "•••••••••";
-  return `${"•".repeat(8)}-${clean.slice(8)}`;
+  return `${"•".repeat(8)}${clean.slice(8)}`;
 }
