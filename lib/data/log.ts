@@ -346,3 +346,33 @@ export async function fetchFeedTimes(
   if (error) throw new Error(error.message);
   return (data ?? []).map((r) => new Date(r.started_at).getTime());
 }
+
+/** העמוד האחרון של הרישומים — לרענון ידני ולחזרה מרקע. */
+export async function fetchLatestEvents(
+  babyId: string,
+  limit = 40,
+): Promise<EventRow[]> {
+  const supabase = getSupabaseBrowserClient();
+  const { data, error } = await supabase
+    .from("events")
+    .select("*")
+    .eq("baby_id", babyId)
+    .is("deleted_at", null)
+    .order("started_at", { ascending: false })
+    .limit(limit);
+
+  if (error) throw new Error(error.message);
+  return data ?? [];
+}
+
+/** הטיימרים שרצים כרגע, כפי שהם בשרת. */
+export async function fetchTimers(babyId: string): Promise<ActiveTimerRow[]> {
+  const supabase = getSupabaseBrowserClient();
+  const { data, error } = await supabase
+    .from("active_timers")
+    .select("*")
+    .eq("baby_id", babyId);
+
+  if (error) throw new Error(error.message);
+  return data ?? [];
+}

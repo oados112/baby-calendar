@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { fetchLatestEvents, fetchTimers } from "@/lib/data/log";
 import type { ActiveTimerRow, EventRow } from "@/types/db";
 
 /**
@@ -53,6 +54,15 @@ export interface LiveData {
   };
   patchTimer: (id: string, patch: Partial<ActiveTimerRow>) => { rollback: () => void };
   removeTimer: (id: string) => { restore: () => void };
+  /**
+   * שולף מחדש מהשרת ומחליף את מה שעל המסך.
+   *
+   * זה מה שכפתור הרענון עושה. router.refresh() לבדו לא הספיק: באתר
+   * מותקן באייפון הוא לא תמיד מגיע לשרת, והמסך נשאר כמו שהיה. כאן
+   * הנתונים נשלפים ישירות מ-Supabase, ולכן זה גם מהיר יותר — רק
+   * הרשימה מתעדכנת, בלי בניית דף מחדש.
+   */
+  refresh: () => Promise<void>;
 }
 
 export function useLiveData({
@@ -192,6 +202,75 @@ export function useLiveData({
     };
   }, []);
 
+  const refresh = useCallback(async () => {
+    if (!enabled) return;
+
+    const [nextEvents, nextTimers] = await Promise.all([
+      fetchLatestEvents(babyId),
+      fetchTimers(babyId),
+    ]);
+
+    // השליפה מכסה רק את העמוד האחרון. מי שגלל אחורה וטען רישומים
+    // ישנים יותר לא אמור לראות אותם נעלמים בלחיצה על רענון, ולכן כל
+    // מה שישן מהרישום הישן ביותר שנשלף נשאר במקומו — ושם ממילא אין
+    // מה שהתיישן.
+    //
+    // רישומים שעדיין ממתינים לאישור נשמרים גם הם: הם טרם קיימים
+    // בשרת, והסרתם הייתה נראית למשתמש כאילו הרישום אבד.
+    const oldestFetched = nextEvents[nextEvents.length - 1]?.started_at;
+
+    setEvents((current) => {
+      const keep = current.filter(
+        (e) =>
+          isPending(e.id) ||
+          (oldestFetched !== undefined && e.started_at < oldestFetched),
+      );
+      const seen = new Set(nextEvents.map((e) => e.id));
+      return sortDesc([...nextEvents, ...keep.filter((e) => !seen.has(e.id))]);
+    });
+    setTimers((current) => [
+      ...nextTimers,
+      ...current.filter(
+        (t) => isPending(t.id) && !nextTimers.some((n) => n.type === t.type),
+      ),
+    ]);
+
+    lastServerEvents.current = nextEvents;
+    lastServerTimers.current = nextTimers;
+  }, [babyId, enabled]);
+
+  /**
+   * חזרה מרקע או מניתוק.
+   *
+   * ה-WebSocket של הסנכרון החי מת כשהאפליקציה יורדת לרקע באייפון, ולא
+   * תמיד קם בחזרה — ואז רישומים מהמכשיר השני פשוט לא מגיעים. שליפה
+   * אחת בחזרה למסך סוגרת את הפער בלי להמתין לשום דבר.
+   */
+  const lastSync = useRef(0);
+  useEffect(() => {
+    if (!enabled) return;
+
+    const maybeSync = () => {
+      if (document.visibilityState !== "visible") return;
+      // חלון קצר כדי לא לשלוף פעמיים כשהדפדפן שולח גם visibilitychange
+      // וגם online באותו רגע
+      const now = Date.now();
+      if (now - lastSync.current < 5000) return;
+      lastSync.current = now;
+      refresh().catch(() => {});
+    };
+
+    document.addEventListener("visibilitychange", maybeSync);
+    window.addEventListener("online", maybeSync);
+    window.addEventListener("focus", maybeSync);
+
+    return () => {
+      document.removeEventListener("visibilitychange", maybeSync);
+      window.removeEventListener("online", maybeSync);
+      window.removeEventListener("focus", maybeSync);
+    };
+  }, [enabled, refresh]);
+
   // סנכרון חי בין המכשירים — החלה נקודתית, בלי בניית דף מחדש
   useEffect(() => {
     if (!enabled) return;
@@ -264,5 +343,6 @@ export function useLiveData({
     addTimer,
     patchTimer,
     removeTimer,
+    refresh,
   };
 }

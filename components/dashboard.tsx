@@ -12,6 +12,7 @@ import { RefreshButton } from "@/components/refresh-button";
 import { DueVaccines } from "@/components/due-vaccines";
 import { RhythmBar } from "@/components/rhythm-bar";
 import { BabySwitcher } from "@/components/baby-switcher";
+import { BabyId } from "@/components/baby-id";
 import { FormForType } from "@/components/log-forms";
 import {
   IconActivity,
@@ -52,6 +53,7 @@ export interface DashboardBaby {
   birth_date: string;
   birth_time: string | null;
   sex: "male" | "female" | "unspecified" | null;
+  national_id?: string | null;
 }
 
 export interface DashboardProps {
@@ -146,6 +148,7 @@ export function Dashboard({
     addTimer,
     patchTimer,
     removeTimer,
+    refresh,
   } = useLiveData({
     babyId: baby.id,
     initialEvents,
@@ -350,12 +353,13 @@ export function Dashboard({
               {newbornAge(baby.birth_date, baby.birth_time) ??
                 babyAgeHebrew(baby.birth_date, baby.sex)}
             </p>
+            {baby.national_id ? <BabyId value={baby.national_id} /> : null}
           </div>
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
           <BabySwitcher babies={siblings} selectedId={baby.id} />
-          <RefreshButton />
+          <RefreshButton onRefresh={refresh} />
         </div>
       </header>
 

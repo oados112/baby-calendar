@@ -78,6 +78,7 @@ export function getDemoBaby() {
     birth_date: "2026-09-12",
     birth_time: "23:24",
     sex: "unspecified" as const,
+    national_id: "123456782",
     birth_weight_g: 2795,
   };
 }

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, TextField } from "@/components/ui";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { isValidNationalId, normalizeNationalId } from "@/lib/national-id";
 import type { BabyRow } from "@/types/db";
 
 /**
@@ -25,6 +26,7 @@ export function BabySettings({ baby }: { baby: BabyRow }) {
   const [weightKg, setWeightKg] = useState(
     baby.birth_weight_g ? (baby.birth_weight_g / 1000).toFixed(3) : "",
   );
+  const [nationalId, setNationalId] = useState(baby.national_id ?? "");
 
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -35,6 +37,15 @@ export function BabySettings({ baby }: { baby: BabyRow }) {
     setMessage(null);
 
     const grams = weightKg ? Math.round(parseFloat(weightKg) * 1000) : null;
+    const id = normalizeNationalId(nationalId);
+
+    // ספרת הביקורת תופסת כמעט כל טעות הקלדה. עדיף לעצור כאן מאשר
+    // לגלות בדלפק של טיפת חלב שהמספר השמור שגוי
+    if (id && !isValidNationalId(id)) {
+      setSaving(false);
+      setMessage("תעודת הזהות אינה תקינה — בדקו את הספרות");
+      return;
+    }
 
     const supabase = getSupabaseBrowserClient();
     const { error } = await supabase
@@ -45,6 +56,7 @@ export function BabySettings({ baby }: { baby: BabyRow }) {
         birth_date: birthDate,
         birth_time: birthTime || null,
         birth_weight_g: Number.isFinite(grams) ? grams : null,
+        national_id: id || null,
       })
       .eq("id", baby.id);
 
@@ -127,6 +139,17 @@ export function BabySettings({ baby }: { baby: BabyRow }) {
           value={weightKg}
           onChange={(e) => setWeightKg(e.target.value)}
           hint="קו הייחוס בגרף הגדילה"
+        />
+
+        <TextField
+          label="תעודת זהות"
+          inputMode="numeric"
+          autoComplete="off"
+          maxLength={9}
+          placeholder="9 ספרות"
+          value={nationalId}
+          onChange={(e) => setNationalId(e.target.value.replace(/\D/g, ""))}
+          hint="מוצגת מוסתרת במסך הבית, ונחשפת בלחיצה"
         />
 
         <Button type="submit" fullWidth loading={saving}>

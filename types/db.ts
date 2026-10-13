@@ -68,6 +68,8 @@ export type BabyRow = {
   birth_date: string;
   birth_time: string | null;
   sex: "male" | "female" | "unspecified" | null;
+  /** תעודת זהות, תשע ספרות. null עד שהיא מונפקת */
+  national_id: string | null;
   photo_path: string | null;
   birth_weight_g: number | null;
   birth_height_cm: number | null;

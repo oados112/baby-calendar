@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 /**
@@ -10,27 +10,44 @@ import { useRouter } from "next/navigation";
  * לרענון — אין סרגל כתובת ואין מחוות רענון. בלי הכפתור הזה אין שום
  * דרך לבקש נתונים טריים חוץ מלסגור ולפתוח את האפליקציה.
  *
- * הסנכרון החי מכסה את רוב המקרים, אבל כשהחיבור נופל ועולה הוא עלול
- * לפספס עדכון, וזה הגיבוי.
+ * **מה שהוא עושה בפועל** הוא לשלוף את הרישומים מחדש מ-Supabase ולהחליף
+ * את מה שעל המסך. הגרסה הקודמת קראה רק ל-router.refresh(), וזה לא
+ * הספיק: באתר מותקן הבקשה לא תמיד מגיעה לשרת, והלחיצה נראתה כאילו
+ * לא קרה כלום. router.refresh() עדיין נקרא אחריו, בשביל החלקים
+ * שמגיעים מהשרת — כרטיס החיסונים, סל התרופות — אבל הוא כבר לא
+ * האחראי היחיד, ואם ייכשל הרשימה כבר התעדכנה.
  */
-export function RefreshButton() {
+export function RefreshButton({
+  onRefresh,
+}: {
+  /** שליפה ישירה של הנתונים. בלעדיה נשארת רק רענון הדף */
+  onRefresh?: () => Promise<void>;
+}) {
   const router = useRouter();
-  const [pending, startTransition] = useTransition();
-  const [minimumSpin, setMinimumSpin] = useState(false);
+  const [spinning, setSpinning] = useState(false);
 
-  function refresh() {
+  async function refresh() {
+    if (spinning) return;
+    setSpinning(true);
+
     // סיבוב מינימלי של חצי שנייה: רענון מהיר מדי נראה כאילו כלום לא קרה
-    setMinimumSpin(true);
-    setTimeout(() => setMinimumSpin(false), 550);
-    startTransition(() => router.refresh());
-  }
+    const minimum = new Promise((resolve) => setTimeout(resolve, 550));
 
-  const spinning = pending || minimumSpin;
+    try {
+      await Promise.all([onRefresh?.(), minimum]);
+    } catch {
+      // הרשימה נשארת כמו שהיא; הסנכרון החי ימשיך לנסות
+    }
+
+    router.refresh();
+    setSpinning(false);
+  }
 
   return (
     <button
       onClick={refresh}
       aria-label="רענון"
+      aria-busy={spinning}
       className="grid size-11 shrink-0 place-items-center rounded-full border border-subtle bg-surface-card text-muted transition-transform duration-150 active:scale-90"
     >
       <svg
