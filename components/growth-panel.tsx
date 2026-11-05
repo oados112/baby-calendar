@@ -1,6 +1,7 @@
 import { StatTile } from "@/components/charts";
 import { shortDate } from "@/lib/zoned";
 import { GrowthCurve } from "@/components/growth-curve";
+import { GrowthTable } from "@/components/growth-table";
 import {
   growthSeries,
   percentileHebrew,
@@ -161,12 +162,20 @@ export function GrowthPanel({
       ) : null}
 
       {birthDate && standardSex ? (
-        <GrowthCurve
-          events={events}
-          birthDate={birthDate}
-          sex={standardSex}
-          indicator="weight"
-        />
+        <>
+          <GrowthCurve
+            events={events}
+            birthDate={birthDate}
+            sex={standardSex}
+            indicator="weight"
+          />
+          <GrowthTable
+            events={events}
+            birthDate={birthDate}
+            sex={standardSex}
+            birthWeightG={birthWeightG}
+          />
+        </>
       ) : (
         <>
           <WeightChart points={weights} birthWeightG={birthWeightG} />

@@ -38,6 +38,8 @@ export function DoctorQuestions({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [answering, setAnswering] = useState<DoctorQuestionRow | null>(null);
+  /** מזהה השאלה שממתינה לאישור מחיקה. אחת בכל רגע. */
+  const [confirming, setConfirming] = useState<string | null>(null);
 
   const open = questions.filter((q) => !q.answered_at);
   const answered = questions.filter((q) => q.answered_at);
@@ -69,6 +71,7 @@ export function DoctorQuestions({
 
   async function remove(id: string) {
     setError(null);
+    setConfirming(null);
     const supabase = getSupabaseBrowserClient();
     const { error: failed } = await supabase
       .from("doctor_questions")
@@ -129,21 +132,57 @@ export function DoctorQuestions({
                 </span>
               </span>
 
+              {/* מחיקה בשתי לחיצות, כמו בכל מחיקה אחרת באתר. שאלה
+                  נכתבת בעייפות ונמחקת בטעות באותה קלות, והכפתור יושב
+                  צמוד ל"נענתה" */}
               {canEdit ? (
-                <span className="flex shrink-0 flex-col items-end gap-1">
-                  <button
-                    onClick={() => setAnswering(q)}
-                    className="text-[0.8125rem] font-medium text-accent-text underline underline-offset-2"
-                  >
-                    נענתה
-                  </button>
-                  <button
-                    onClick={() => remove(q.id)}
-                    className="text-[0.75rem] text-faint"
-                  >
-                    מחיקה
-                  </button>
-                </span>
+                confirming === q.id ? (
+                  <span className="flex shrink-0 flex-col items-end gap-0.5">
+                    <span className="text-[0.75rem] text-muted">למחוק?</span>
+                    <span className="flex items-center gap-2">
+                      <button
+                        onClick={() => remove(q.id)}
+                        className="min-h-tap text-[0.8125rem] font-medium text-late underline underline-offset-2"
+                      >
+                        כן, למחוק
+                      </button>
+                      <button
+                        onClick={() => setConfirming(null)}
+                        className="min-h-tap text-[0.8125rem] text-muted"
+                      >
+                        ביטול
+                      </button>
+                    </span>
+                  </span>
+                ) : (
+                  <span className="flex shrink-0 items-center gap-3">
+                    <button
+                      onClick={() => setAnswering(q)}
+                      className="min-h-tap text-[0.8125rem] font-medium text-accent-text underline underline-offset-2"
+                    >
+                      נענתה
+                    </button>
+                    <button
+                      onClick={() => setConfirming(q.id)}
+                      aria-label={`מחיקת השאלה: ${q.text}`}
+                      // שטח מגע מלא ולא רק גובה: 24 פיקסל רוחב הם החטאה בטוחה
+                      className="grid min-h-tap w-11 place-items-center text-muted"
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={1.75}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden
+                        className="size-4"
+                      >
+                        <path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" />
+                      </svg>
+                    </button>
+                  </span>
+                )
               ) : null}
             </li>
           ))}

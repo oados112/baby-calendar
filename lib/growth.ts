@@ -145,6 +145,24 @@ export function growthSeries(
 }
 
 /**
+ * גיל קצר לתא בטבלה: "לידה", "12 ימים", "7 שבועות", "4 חודשים".
+ *
+ * בלי שארית הימים, בניגוד לכותרת במסך הבית — בטבלה הגיל הוא עמודת
+ * עזר שמסבירה מתי, והדיוק נמצא ממילא בעמודת התאריך.
+ */
+export function compactAge(ageDays: number): string {
+  if (ageDays <= 0) return "לידה";
+  if (ageDays === 1) return "יום";
+  if (ageDays < 14) return `${ageDays} ימים`;
+  if (ageDays < 91) {
+    const weeks = Math.floor(ageDays / 7);
+    return weeks === 2 ? "שבועיים" : `${weeks} שבועות`;
+  }
+  const months = Math.round(ageDays / 30.4375);
+  return months === 2 ? "חודשיים" : `${months} חודשים`;
+}
+
+/**
  * ניסוח האחוזון בעברית.
  *
  * מתחת ל-1 ומעל ל-99 לא מציגים מספר: ההפרש בין אחוזון 0.4 ל-0.8 אינו
