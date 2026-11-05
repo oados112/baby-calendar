@@ -7,6 +7,8 @@ import {
   INDICATOR_LABEL,
   INDICATOR_UNIT,
   MAX_AGE_DAYS,
+  percentileToZ,
+  REFERENCE_PERCENTILES,
   valueAtZ,
   type GrowthIndicator,
   type GrowthPoint,
@@ -34,8 +36,8 @@ import type { EventRow } from "@/types/db";
  * פיקסלים אי אפשר לפגוע באגודל.
  */
 
-/** z של אחוזון 3, 15, 50, 85, 97 — הרצועות שמופיעות בפנקס. */
-const BAND_Z = [-1.881, -1.036, 0, 1.036, 1.881];
+/** אותם אחוזונים שבטבלה ובפנקס, מומרים לסטיות תקן מדויקות. */
+const BAND_Z = REFERENCE_PERCENTILES.map(percentileToZ);
 
 const W = 320;
 const H = 190;

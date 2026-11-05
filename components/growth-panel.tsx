@@ -2,7 +2,9 @@ import { StatTile } from "@/components/charts";
 import { shortDate } from "@/lib/zoned";
 import { GrowthCurve } from "@/components/growth-curve";
 import { GrowthTable } from "@/components/growth-table";
+import { GrowthReference } from "@/components/growth-reference";
 import {
+  ageDaysAt,
   growthSeries,
   percentileHebrew,
   type GrowthIndicator,
@@ -174,6 +176,15 @@ export function GrowthPanel({
             birthDate={birthDate}
             sex={standardSex}
             birthWeightG={birthWeightG}
+          />
+          {/* השבוע הנוכחי מחושב כאן, בשרת: רכיב הטבלה הוא רכיב לקוח,
+              וחישוב "היום" בשני הצדדים היה נותן תוצאות שונות */}
+          <GrowthReference
+            sex={standardSex}
+            indicator="weight"
+            currentWeek={Math.floor(
+              ageDaysAt(birthDate, new Date().toISOString()) / 7,
+            )}
           />
         </>
       ) : (
