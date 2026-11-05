@@ -6,6 +6,8 @@ import { Button } from "@/components/ui";
 import { formatHours } from "@/lib/stats";
 import { summaryAsText, type MedicalSummary } from "@/lib/medical-summary";
 import type { VaccineItem } from "@/lib/vaccines";
+import { DoctorQuestions } from "@/components/doctor-questions";
+import type { DoctorQuestionRow } from "@/types/db";
 import { formatClock } from "@/lib/time";
 import { longDate, shortDate, weekdayShort } from "@/lib/zoned";
 
@@ -22,6 +24,10 @@ export function DoctorView({
   summary,
   babyName,
   vaccines = [],
+  questions = [],
+  babyId,
+  currentUserId,
+  canEdit = false,
   babyAge,
   dayCount,
 }: {
@@ -29,6 +35,11 @@ export function DoctorView({
   babyName: string;
   /** מצב כל שורה בלוח החיסונים — ריק כשאין תאריך לידה */
   vaccines?: VaccineItem[];
+  /** שאלות שנאספו עד הביקור */
+  questions?: DoctorQuestionRow[];
+  babyId?: string;
+  currentUserId?: string;
+  canEdit?: boolean;
   babyAge: string;
   dayCount: number;
 }) {
@@ -84,6 +95,17 @@ export function DoctorView({
       </nav>
 
       <main id="main" className="flex flex-col gap-4">
+        {/* ראשון ברשימה: זה מה שבאתם לשאול, וכל השאר הוא מה שתענו
+            עליו כשישאלו אתכם */}
+        {babyId && currentUserId ? (
+          <DoctorQuestions
+            babyId={babyId}
+            currentUserId={currentUserId}
+            questions={questions}
+            canEdit={canEdit}
+          />
+        ) : null}
+
         <Block title="ממוצעים יומיים">
           <Row label="האכלות" value={summary.avgFeeds.toFixed(1)} />
           {summary.avgBottleMl > 0 ? (

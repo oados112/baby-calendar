@@ -159,6 +159,17 @@ export type MedicationPlanRow = {
   updated_at: string;
 };
 
+export type DoctorQuestionRow = {
+  id: string;
+  family_id: string;
+  baby_id: string;
+  text: string;
+  answer: string | null;
+  answered_at: string | null;
+  created_at: string;
+  created_by: string;
+};
+
 type TableDef<Row, Insert = Partial<Row>, Update = Partial<Row>> = {
   Row: Row;
   Insert: Insert;
@@ -184,6 +195,11 @@ export interface Database {
           Partial<PushSubscriptionRow>
       >;
       reminder_rules: TableDef<ReminderRuleRow>;
+      doctor_questions: TableDef<
+        DoctorQuestionRow,
+        Pick<DoctorQuestionRow, "baby_id" | "text" | "created_by"> &
+          Partial<DoctorQuestionRow>
+      >;
       medication_plans: TableDef<
         MedicationPlanRow,
         Pick<MedicationPlanRow, "baby_id" | "name"> & Partial<MedicationPlanRow>

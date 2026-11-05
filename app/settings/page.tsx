@@ -71,6 +71,23 @@ export default async function SettingsPage() {
             <span className="shrink-0 text-[0.8125rem] text-accent-text">פתיחה</span>
           </Link>
 
+          {/* השאלות נאספות בבית ונשאלות במרפאה, אז הן צריכות להיות
+              במרחק נגיעה משני המקומות */}
+          <Link
+            href="/doctor"
+            className="flex items-center justify-between gap-3 rounded-lg border border-subtle bg-surface-card px-4 py-3.5 transition-transform duration-150 active:scale-[0.99]"
+          >
+            <span>
+              <span className="block text-[0.9375rem] font-semibold text-strong">
+                שאלות לרופא
+              </span>
+              <span className="block text-[0.8125rem] text-muted">
+                נוספות מתי שנזכרים, ומחכות בסיכום לביקור
+              </span>
+            </span>
+            <span className="shrink-0 text-[0.8125rem] text-accent-text">פתיחה</span>
+          </Link>
+
           <NotificationSettings
             userId={context.member.user_id}
             rules={(rules ?? []) as ReminderRuleRow[]}

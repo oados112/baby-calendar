@@ -4,6 +4,7 @@ import { isSupabaseConfigured } from "@/lib/config";
 import {
   getEventsBetween,
   getFamilyContext,
+  getDoctorQuestions,
   getSelectedBaby,
   getVaccineEvents,
 } from "@/lib/data/family";
@@ -46,12 +47,20 @@ export default async function DoctorPage({ searchParams }: PageProps<"/doctor">)
 
   // החיסונים נשלפים בנפרד ולא מוגבלים לחלון הימים שנבחר: הם ניתנים
   // אחת לחודשיים, והשאלה "מה קיבלה עד היום" אינה שאלה על השבוע
-  const vaccines = vaccineItems(baby.birth_date, await getVaccineEvents(baby.id));
+  const [vaccineEvents, questions] = await Promise.all([
+    getVaccineEvents(baby.id),
+    getDoctorQuestions(baby.id),
+  ]);
+  const vaccines = vaccineItems(baby.birth_date, vaccineEvents);
 
   return (
     <DoctorView
       summary={summary}
       vaccines={vaccines}
+      questions={questions}
+      babyId={baby.id}
+      currentUserId={context.member.user_id}
+      canEdit={context.member.role !== "viewer"}
       babyName={babyDisplayName(baby.name)}
       babyAge={babyAgeHebrew(baby.birth_date, baby.sex)}
       dayCount={dayCount}

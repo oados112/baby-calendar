@@ -3,6 +3,7 @@ import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { pickBaby, SELECTED_BABY_COOKIE } from "@/lib/babies";
 import type {
   ActiveTimerRow,
+  DoctorQuestionRow,
   BabyRow,
   EventRow,
   FamilyMemberRow,
@@ -259,6 +260,20 @@ export async function getVaccineEvents(babyId: string): Promise<EventRow[]> {
     .eq("type", "vaccine")
     .is("deleted_at", null)
     .order("started_at", { ascending: false });
+
+  return data ?? [];
+}
+
+/** השאלות לרופא של תינוק, הפתוחות קודם ואז שנענו. */
+export async function getDoctorQuestions(
+  babyId: string,
+): Promise<DoctorQuestionRow[]> {
+  const supabase = await getSupabaseServerClient();
+  const { data } = await supabase
+    .from("doctor_questions")
+    .select("*")
+    .eq("baby_id", babyId)
+    .order("created_at", { ascending: false });
 
   return data ?? [];
 }
