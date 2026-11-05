@@ -137,8 +137,14 @@ export function buildMedicalSummary(
       if (e.type !== "diaper") continue;
       const d = (e.data ?? {}) as Record<string, unknown>;
       if (!d.poo) continue;
-      const label = labels[String(d[key])];
-      if (label) counts.set(label, (counts.get(label) ?? 0) + 1);
+
+      // מרקם יכול להיות מערך; צבע וכמות הם ערך יחיד. טיפול אחיד בשניהם
+      // חוסך שתי לולאות כמעט זהות, וממשיך לקרוא נכון רישומים ישנים
+      const raw = Array.isArray(d[key]) ? (d[key] as unknown[]) : [d[key]];
+      for (const value of raw) {
+        const label = labels[String(value)];
+        if (label) counts.set(label, (counts.get(label) ?? 0) + 1);
+      }
     }
     return [...counts.entries()]
       .map(([label, count]) => ({ label, count }))

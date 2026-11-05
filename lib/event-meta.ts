@@ -206,6 +206,17 @@ export const DIAPER_TEXTURE: Record<string, string> = {
 };
 
 /**
+ * תוויות המרקם של רישום חיתול.
+ *
+ * מקבל גם מערך וגם מחרוזת בודדת: רישומים שנעשו לפני שהמרקם הפך
+ * לבחירה מרובה שמרו מחרוזת, והם חייבים להמשיך להיקרא נכון.
+ */
+export function textureLabels(value: unknown): string[] {
+  const raw = Array.isArray(value) ? value : value ? [value] : [];
+  return raw.map((t) => DIAPER_TEXTURE[String(t)]).filter(Boolean);
+}
+
+/**
  * סיכום קריא בעברית של רישום, לפי הנתונים שלו.
  * לדוגמה: בקבוק 120 מ"ל · תמ"ל
  */
@@ -268,8 +279,9 @@ export function summarizeEvent(type: EventType, data: unknown): string | null {
       if (d.poo) {
         const amount = DIAPER_AMOUNT[String(d.amount)];
         const color = DIAPER_COLOR[String(d.color)];
-        const texture = DIAPER_TEXTURE[String(d.texture)];
-        parts.push(...[amount, color, texture].filter(Boolean));
+        parts.push(...[amount, color].filter(Boolean));
+        // המרקם יכול להיות יותר מאחד: "מימי · גרגירי"
+        parts.push(...textureLabels(d.texture));
       }
 
       if (d.rash) parts.push("אדמומיות");

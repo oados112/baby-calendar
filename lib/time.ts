@@ -99,6 +99,14 @@ export function hebrewWeekday(d: Date): string {
 /**
  * גיל התינוק בעברית: "בן 12 ימים" / "בן חודש ו-3 שבועות" / "בן שנה ו-2 חודשים"
  */
+/** " ו-6 ימים", או מחרוזת ריקה כשאין שארית. */
+function remainderDays(days: number): string {
+  if (days <= 0) return "";
+  if (days === 1) return " ויום";
+  if (days === 2) return " ויומיים";
+  return ` ו-${days} ימים`;
+}
+
 export function babyAgeHebrew(
   birthDate: string,
   sex: "male" | "female" | "unspecified" | null,
@@ -113,16 +121,33 @@ export function babyAgeHebrew(
   if (days === 0) return "נולד היום";
   if (days === 1) return `${ben}יום`;
   if (days < 14) return `${ben}${days} ימים`;
-  if (days < 60) {
+
+  // עד שלושה חודשים סופרים בשבועות, ועם שארית הימים: בטיפת חלב
+  // שואלים "בן כמה?", ו"שבעה שבועות" כשבפועל עברו שבעה ושישה ימים
+  // זה כמעט שמונה — הפרש שמשנה בשאלות של משקל ושל חיסונים.
+  //
+  // הגבול הוא 91 יום ולא 60 בכוונה: ב-60 המעבר נופל באמצע החודש
+  // ויוצא "חודש ו-30 ימים", שזה נכון אבל לא דרך שבה מישהו מדבר
+  if (days < 91) {
     const weeks = Math.floor(days / 7);
-    return `${ben}${weeks} שבועות`;
+    return `${ben}${weeks} שבועות${remainderDays(days % 7)}`;
   }
 
   let months =
     (now.getFullYear() - b.getFullYear()) * 12 + (now.getMonth() - b.getMonth());
   if (now.getDate() < b.getDate()) months -= 1;
 
-  if (months < 24) return months === 1 ? `${ben}חודש` : `${ben}${months} חודשים`;
+  if (months < 24) {
+    // אותו היגיון גם בחודשים: הימים מאז יום ההולדת החודשי
+    const anniversary = new Date(b);
+    anniversary.setFullYear(b.getFullYear(), b.getMonth() + months, b.getDate());
+    const extra = Math.max(
+      0,
+      Math.floor((now.getTime() - anniversary.getTime()) / (DAY * 1000)),
+    );
+    const monthPart = months === 1 ? "חודש" : `${months} חודשים`;
+    return `${ben}${monthPart}${remainderDays(extra)}`;
+  }
 
   const years = Math.floor(months / 12);
   const rem = months % 12;

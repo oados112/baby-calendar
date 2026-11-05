@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useNow } from "@/lib/use-now";
 import { Button } from "@/components/ui";
-import { checkDose, findMedicine, MEDICINES } from "@/lib/medicines";
+import { checkDose, findMedicine, matchMedicine, MEDICINES } from "@/lib/medicines";
 import { describeDose, describeSchedule, type MedicationPlan } from "@/lib/medication-plans";
 import { durationHebrew } from "@/lib/time";
 import type { LogInput } from "@/lib/data/log";
@@ -183,6 +183,62 @@ function ChoiceRow<T extends string>({
   );
 }
 
+/**
+ * בחירה מרובה.
+ *
+ * קיים בנפרד מ-ChoiceRow כי ההתנהגות שונה: לחיצה מוסיפה ומסירה במקום
+ * להחליף. נדרש למרקם של הקקי, שבאמת יכול להיות מימי *וגם* גרגירי —
+ * בחירה יחידה אילצה לבחור את הפחות נכון מבין השניים.
+ */
+function MultiChoiceRow({
+  label,
+  options,
+  value,
+  onChange,
+  hint,
+}: {
+  label: string;
+  options: { value: string; label: string }[];
+  value: string[];
+  onChange: (v: string[]) => void;
+  hint?: string;
+}) {
+  function toggle(option: string) {
+    onChange(
+      value.includes(option)
+        ? value.filter((v) => v !== option)
+        : // נשמר לפי סדר האפשרויות ולא לפי סדר הלחיצות, כדי ששני
+          // רישומים זהים ייראו זהה גם בסיכום
+          options.map((o) => o.value).filter((v) => v === option || value.includes(v)),
+    );
+  }
+
+  return (
+    <fieldset className="flex flex-col gap-2">
+      <legend className="mb-1 text-[0.875rem] font-medium text-default">{label}</legend>
+      <div className="flex flex-wrap gap-1.5">
+        {options.map((o) => (
+          <button
+            key={o.value}
+            type="button"
+            aria-pressed={value.includes(o.value)}
+            onClick={() => toggle(o.value)}
+            className={[
+              "min-h-tap flex-1 rounded-md border px-3 text-[0.9375rem] transition-colors duration-150",
+              value.includes(o.value)
+                ? "border-accent bg-accent-soft font-medium text-accent-text"
+                : "border-line bg-surface-card text-default",
+            ].join(" ")}
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
+      {hint ? <p className="text-[0.75rem] text-faint">{hint}</p> : null}
+    </fieldset>
+  );
+}
+
 /** שדה מספרי עם תווית ויחידה. */
 function NumberField({
   label,
@@ -264,7 +320,11 @@ export function DiaperForm({ babyId, familyId, submit, initial, onDone }: FormPr
   const [kind, setKind] = useState(initialKind);
   const [color, setColor] = useState<string | null>(str(d, "color"));
   const [amount, setAmount] = useState<string | null>(str(d, "amount"));
-  const [texture, setTexture] = useState<string | null>(str(d, "texture"));
+  // רישומים ישנים שמרו מחרוזת אחת; החדשים שומרים מערך
+  const [texture, setTexture] = useState<string[]>(() => {
+    if (Array.isArray(d.texture)) return d.texture.filter((t) => typeof t === "string");
+    return typeof d.texture === "string" ? [d.texture] : [];
+  });
   const [rash, setRash] = useState(Boolean(d.rash));
   const [at, setAt] = useState(startOf(initial));
   const [note, setNote] = useState(initial?.note ?? "");
@@ -290,7 +350,7 @@ export function DiaperForm({ babyId, familyId, submit, initial, onDone }: FormPr
             // תלוי באוויר אחרי שינוי הסוג בעריכה
             color: hasPoo ? color : null,
             amount: hasPoo ? amount : null,
-            texture: hasPoo ? texture : null,
+            texture: hasPoo && texture.length > 0 ? texture : null,
             rash,
           },
           photoPath: photo.photoPath
@@ -338,10 +398,11 @@ export function DiaperForm({ babyId, familyId, submit, initial, onDone }: FormPr
             ]}
           />
 
-          <ChoiceRow
+          <MultiChoiceRow
             label="מרקם"
             value={texture}
             onChange={setTexture}
+            hint="אפשר לבחור יותר מאחד — מימי וגרגירי יחד הוא מצב נפוץ"
             options={[
               { value: "soft", label: "רך" },
               { value: "watery", label: "מימי" },
@@ -803,8 +864,16 @@ export function MedicineForm({
 }: FormProps) {
   const d = initialData(initial);
   const [planId, setPlanId] = useState<string | null>(str(d, "plan_id"));
-  const [medicineId, setMedicineId] = useState(
-    str(d, "medicine_id") ?? MEDICINES[0].id,
+  /**
+   * **אין בחירה מראש.**
+   *
+   * קודם השדה נפתח על הפריט הראשון ברשימה, שהוא אקמול. מי שפתח את
+   * הטופס ולחץ שמירה בלי לשים לב רשם שנתן אקמול. בטופס של תרופה זו
+   * לא אי-נוחות קטנה — זה רישום רפואי שגוי, והוא גם משבש את בדיקת
+   * המרווח בין מנות.
+   */
+  const [medicineId, setMedicineId] = useState<string | null>(
+    str(d, "medicine_id"),
   );
   const [customName, setCustomName] = useState(
     str(d, "medicine_id") === "other" ? (str(d, "name") ?? "") : "",
@@ -818,7 +887,7 @@ export function MedicineForm({
   const [note, setNote] = useState(initial?.note ?? "");
 
   const now = useNow();
-  const check = now
+  const check = now && medicineId
     ? checkDose({
         medicineId,
         // בעריכה לא בודקים מול הרישום של עצמו
@@ -836,6 +905,11 @@ export function MedicineForm({
       className="flex flex-col gap-4"
       onSubmit={(e) => {
         e.preventDefault();
+        if (!medicineId) {
+          onError("צריך לבחור מה ניתן");
+          return;
+        }
+
         const name = medicineId === "other" ? customName.trim() : medicine.label;
         if (!name) {
           onError("צריך למלא שם תרופה");
@@ -873,8 +947,12 @@ export function MedicineForm({
                 aria-pressed={planId === plan.id}
                 onClick={() => {
                   setPlanId(plan.id);
-                  setMedicineId("other");
-                  setCustomName(plan.name);
+                  // כשהשם בסל מתאים לתרופה מוכרת, שומרים את הזהות שלה
+                  // ולא "אחר": בלי זה בדיקת המרווח בין מנות לא מזהה
+                  // שהמנה הקודמת הייתה מאותו חומר
+                  const known = matchMedicine(plan.name);
+                  setMedicineId(known?.id ?? "other");
+                  setCustomName(known ? "" : plan.name);
                   if (plan.dose_amount !== null) setDose(String(plan.dose_amount));
                   if (plan.dose_unit) setUnit(plan.dose_unit);
                 }}

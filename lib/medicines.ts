@@ -34,6 +34,15 @@ export const MEDICINES: MedicineDef[] = [
     note: "בדרך כלל לא יותר מ-4 מנות ביממה",
   },
   {
+    id: "novimol",
+    label: "נובימול",
+    ingredient: "פרצטמול",
+    units: ["מ״ל", "טיפות", "מ״ג"],
+    minHours: 4,
+    maxPerDay: 4,
+    note: "אותו חומר פעיל כמו אקמול — המנות נספרות יחד",
+  },
+  {
     id: "ibuprofen",
     label: "נורופן / איבופרופן",
     ingredient: "איבופרופן",
@@ -107,12 +116,21 @@ export function checkDose({
 }): DoseCheck {
   const dayAgo = now.getTime() - 24 * 3600_000;
 
+  // ההשוואה היא לפי החומר הפעיל ולא לפי המותג.
+  //
+  // אקמול ונובימול הם אותו פרצטמול. מי שנתן אקמול ושעתיים אחר כך
+  // נובימול נתן מנה כפולה, ובדיקה לפי מזהה המותג הייתה אומרת לו
+  // שהכל בסדר. זו בדיוק הטעות שהבדיקה הזו קיימת כדי למנוע.
+  const selected = findMedicine(medicineId);
+  const sameSubstance = (id: unknown): boolean => {
+    if (id === medicineId) return true;
+    if (!selected.ingredient || typeof id !== "string") return false;
+    return findMedicine(id).ingredient === selected.ingredient;
+  };
+
   const doses = events
     .filter((e) => e.type === "medicine")
-    .filter((e) => {
-      const data = (e.data ?? {}) as Record<string, unknown>;
-      return data.medicine_id === medicineId;
-    })
+    .filter((e) => sameSubstance((e.data as Record<string, unknown> | null)?.medicine_id))
     .sort((a, b) => b.started_at.localeCompare(a.started_at));
 
   const last = doses[0] ?? null;
@@ -141,4 +159,31 @@ export function checkDose({
     overDailyLimit: maxPerDay ? dosesToday >= maxPerDay : false,
     lastGivenAt: last.started_at,
   };
+}
+
+/**
+ * מאתר תרופה מוכרת לפי שם חופשי.
+ *
+ * משמש כשבוחרים פריט מסל התרופות של המשפחה: הסל שומר שם שההורה
+ * הקליד ("ויטמין D"), ואילו בדיקת המרווח בין מנות עובדת לפי מזהה
+ * תרופה. בלי ההתאמה הזו כל מנה מהסל נרשמת כ"אחר", ואז אין מה להשוות
+ * אליו.
+ *
+ * ההשוואה רופפת בכוונה — מתעלמת מרווחים, מרישיות ומסימני פיסוק —
+ * כי "ויטמין D" ו-"ויטמין d." הם אותו דבר.
+ */
+export function matchMedicine(name: string): MedicineDef | null {
+  const normalize = (v: string) => v.toLowerCase().replace(/[\s.,/-]/g, "");
+  const target = normalize(name);
+  if (!target) return null;
+
+  return (
+    MEDICINES.find(
+      (m) =>
+        m.id !== "other" &&
+        (normalize(m.label) === target ||
+          // "אקמול / פרצטמול" — גם כל חלק מהתווית נחשב התאמה
+          m.label.split("/").some((part) => normalize(part) === target)),
+    ) ?? null
+  );
 }
