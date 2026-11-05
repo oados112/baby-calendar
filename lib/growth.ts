@@ -184,21 +184,26 @@ export function growthSeries(
 }
 
 /**
- * גיל קצר לתא בטבלה: "לידה", "12 ימים", "7 שבועות", "4 חודשים".
+ * גיל בשבועות ובימים: "לידה", "4 ימים", "שבוע ויומיים", "7 שבועות ו-5 ימים".
  *
- * בלי שארית הימים, בניגוד לכותרת במסך הבית — בטבלה הגיל הוא עמודת
- * עזר שמסבירה מתי, והדיוק נמצא ממילא בעמודת התאריך.
+ * זו היחידה שבה מדברים על שקילה, וזו גם היחידה של טבלת הייחוס — כך
+ * ש"7 שבועות ו-5 ימים" נקרא ישירות מול שורת שבוע 7 ומסביר מיד למה
+ * אותו משקל נותן אחוזון נמוך יותר מזה שבשורה.
  */
-export function compactAge(ageDays: number): string {
+export function weeksAndDays(ageDays: number): string {
   if (ageDays <= 0) return "לידה";
-  if (ageDays === 1) return "יום";
-  if (ageDays < 14) return `${ageDays} ימים`;
-  if (ageDays < 91) {
-    const weeks = Math.floor(ageDays / 7);
-    return weeks === 2 ? "שבועיים" : `${weeks} שבועות`;
-  }
-  const months = Math.round(ageDays / 30.4375);
-  return months === 2 ? "חודשיים" : `${months} חודשים`;
+  if (ageDays < 7) return ageDays === 1 ? "יום" : ageDays === 2 ? "יומיים" : `${ageDays} ימים`;
+
+  const weeks = Math.floor(ageDays / 7);
+  const days = ageDays % 7;
+
+  const weekPart =
+    weeks === 1 ? "שבוע" : weeks === 2 ? "שבועיים" : `${weeks} שבועות`;
+
+  if (days === 0) return weekPart;
+  if (days === 1) return `${weekPart} ויום`;
+  if (days === 2) return `${weekPart} ויומיים`;
+  return `${weekPart} ו-${days} ימים`;
 }
 
 /**

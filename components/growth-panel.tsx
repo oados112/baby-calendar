@@ -182,9 +182,7 @@ export function GrowthPanel({
           <GrowthReference
             sex={standardSex}
             indicator="weight"
-            currentWeek={Math.floor(
-              ageDaysAt(birthDate, new Date().toISOString()) / 7,
-            )}
+            currentAgeDays={ageDaysAt(birthDate, new Date().toISOString())}
           />
         </>
       ) : (

@@ -2,9 +2,13 @@
 
 import { useEffect, useRef } from "react";
 import {
+  MAX_AGE_DAYS,
+  percentileToZ,
   referenceRows,
   REFERENCE_PERCENTILES,
   INDICATOR_UNIT,
+  valueAtZ,
+  weeksAndDays,
   type GrowthIndicator,
   type GrowthSex,
 } from "@/lib/growth";
@@ -25,12 +29,12 @@ import {
 export function GrowthReference({
   sex,
   indicator,
-  currentWeek,
+  currentAgeDays,
 }: {
   sex: GrowthSex;
   indicator: GrowthIndicator;
-  /** השבוע שבו היא נמצאת היום — מחושב בשרת כדי שלא יהיה הבדל בהידרציה */
-  currentWeek: number;
+  /** הגיל המדויק בימים — מחושב בשרת כדי שלא יהיה הבדל בהידרציה */
+  currentAgeDays: number;
 }) {
   const scroller = useRef<HTMLDivElement>(null);
   const current = useRef<HTMLTableRowElement>(null);
@@ -46,10 +50,59 @@ export function GrowthReference({
       0,
       row.offsetTop - box.clientHeight / 2 + row.offsetHeight / 2,
     );
-  }, [currentWeek]);
+  }, [currentAgeDays]);
 
-  const rows = referenceRows(sex, indicator);
   const decimals = indicator === "weight" ? 3 : 1;
+
+  /**
+   * שורות השבועות, ובתוכן שורת "היום".
+   *
+   * בלי שורת היום הטבלה מטעה: היא בת 54 יום, שורת "שבוע 7" היא יום
+   * 49, והחציון עולה כעשרים ותשעה גרם ליום — כלומר אותו משקל בדיוק
+   * שווה כתשעה אחוזונים פחות. השורה הזו היא הערך האמיתי להיום.
+   */
+  const weeks = referenceRows(sex, indicator);
+  const todayValues =
+    currentAgeDays >= 0 && currentAgeDays <= MAX_AGE_DAYS
+      ? REFERENCE_PERCENTILES.map((p) =>
+          valueAtZ(sex, indicator, currentAgeDays, percentileToZ(p)),
+        )
+      : null;
+
+  const onWeekBoundary = currentAgeDays % 7 === 0;
+  const rows: {
+    key: string;
+    label: string;
+    sub: string | null;
+    values: number[];
+    today: boolean;
+  }[] = [];
+
+  for (const row of weeks) {
+    rows.push({
+      key: `w${row.week}`,
+      label: String(row.week),
+      sub: `יום ${row.ageDays}`,
+      values: row.values,
+      today: onWeekBoundary && row.ageDays === currentAgeDays,
+    });
+
+    // נכנסת מיד אחרי השבוע שקדם לה, במקום הנכון על ציר הזמן
+    if (
+      !onWeekBoundary &&
+      todayValues &&
+      currentAgeDays > row.ageDays &&
+      currentAgeDays < row.ageDays + 7
+    ) {
+      rows.push({
+        key: "today",
+        label: "היום",
+        sub: weeksAndDays(currentAgeDays),
+        values: todayValues as number[],
+        today: true,
+      });
+    }
+  }
 
   return (
     <section className="mt-5">
@@ -57,8 +110,9 @@ export function GrowthReference({
         טבלת האחוזונים לפי שבוע
       </h3>
       <p className="mt-0.5 mb-2 text-[0.75rem] leading-relaxed text-muted">
-        המשקל ב{INDICATOR_UNIT[indicator]} שמתאים לכל אחוזון בכל שבוע, לפי תקן
-        WHO. השורה המסומנת היא השבוע הנוכחי.
+        המשקל ב{INDICATOR_UNIT[indicator]} שמתאים לכל אחוזון, לפי תקן WHO.
+        כל שורה היא שבוע מלא — שבוע 7 הוא יום 49 — והשורה המסומנת היא
+        הגיל המדויק שלה היום.
       </p>
 
       <div
@@ -87,10 +141,10 @@ export function GrowthReference({
           </thead>
           <tbody>
             {rows.map((row) => {
-              const isNow = row.week === currentWeek;
+              const isNow = row.today;
               return (
                 <tr
-                  key={row.week}
+                  key={row.key}
                   ref={isNow ? current : undefined}
                   aria-current={isNow ? "true" : undefined}
                   className={isNow ? "bg-accent-soft" : undefined}
@@ -98,11 +152,16 @@ export function GrowthReference({
                   <th
                     scope="row"
                     className={[
-                      "tnum border-b border-subtle px-2 py-1.5 text-start font-normal",
+                      "border-b border-subtle px-2 py-1.5 text-start font-normal",
                       isNow ? "font-semibold text-accent-text" : "text-muted",
                     ].join(" ")}
                   >
-                    {row.week}
+                    <span className="tnum">{row.label}</span>
+                    {row.sub ? (
+                      <span className="tnum block text-[0.6875rem] text-faint">
+                        {row.sub}
+                      </span>
+                    ) : null}
                   </th>
                   {row.values.map((v, i) => (
                     <td

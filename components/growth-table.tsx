@@ -1,5 +1,5 @@
 import {
-  compactAge,
+  weeksAndDays,
   growthSeries,
   growthZ,
   zToPercentile,
@@ -91,7 +91,7 @@ export function GrowthTable({
                   {shortDate(p.at.slice(0, 10))}
                 </td>
                 <td className="border-b border-subtle py-2 text-start text-muted">
-                  {compactAge(p.ageDays)}
+                  {weeksAndDays(p.ageDays)}
                 </td>
                 <td className="tnum border-b border-subtle py-2 text-end text-strong">
                   {p.value.toFixed(3)}

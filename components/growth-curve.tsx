@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import {
-  compactAge,
+  weeksAndDays,
   growthSeries,
   INDICATOR_LABEL,
   INDICATOR_UNIT,
@@ -228,8 +228,7 @@ export function GrowthCurve({
           {fullDate(active.at)}
         </span>
         <span className="block text-[0.75rem] text-faint">
-          {compactAge(active.ageDays)}
-          {active.ageDays > 0 ? ` · ${active.ageDays} ימים` : ""}
+          {weeksAndDays(active.ageDays)}
           {points.length > 1 ? " · לחיצה על נקודה בגרף מציגה שקילה אחרת" : ""}
         </span>
       </figcaption>
