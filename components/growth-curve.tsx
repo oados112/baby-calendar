@@ -1,13 +1,18 @@
+"use client";
+
+import { useState } from "react";
 import {
+  compactAge,
   growthSeries,
   INDICATOR_LABEL,
   INDICATOR_UNIT,
   MAX_AGE_DAYS,
   valueAtZ,
   type GrowthIndicator,
+  type GrowthPoint,
   type GrowthSex,
 } from "@/lib/growth";
-import { shortDate } from "@/lib/zoned";
+import { longDate } from "@/lib/zoned";
 import type { EventRow } from "@/types/db";
 
 /**
@@ -22,6 +27,11 @@ import type { EventRow } from "@/types/db";
  * **הצבע כאן אינו קטגורי.** הרצועות הן רקע סדרתי — ככל שמתרחקים
  * מהחציון הגוון מתעבה — והקו שלה הוא הנתון היחיד שנושא זהות. לכן
  * גוון אחד לרצועות ברמות שקיפות שונות, וצבע הגדילה של האתר לקו.
+ *
+ * **הנקודות נלחצות.** ה-title של SVG מופיע רק בריחוף, כלומר בטלפון
+ * אף פעם. לחיצה על נקודה פותחת מתחת לגרף את הפרטים המלאים של אותה
+ * שקילה, ושטח המגע גדול בהרבה מהנקודה הנראית — נקודה ברדיוס ארבעה
+ * פיקסלים אי אפשר לפגוע באגודל.
  */
 
 /** z של אחוזון 3, 15, 50, 85, 97 — הרצועות שמופיעות בפנקס. */
@@ -32,6 +42,8 @@ const H = 190;
 const PAD_X = 36;
 const PAD_TOP = 14;
 const PAD_BOTTOM = 26;
+/** שטח המגע סביב כל נקודה, ברדיוס. גדול בהרבה מהנקודה הנראית. */
+const HIT_R = 15;
 
 export function GrowthCurve({
   events,
@@ -45,10 +57,13 @@ export function GrowthCurve({
   indicator: GrowthIndicator;
 }) {
   const points = growthSeries(events, birthDate, sex, indicator);
+
+  // המדידה האחרונה פתוחה כברירת מחדל: הגרף אומר משהו כבר במבט
+  // הראשון, בלי שצריך ללחוץ כדי שיהיה בו מידע
+  const [selected, setSelected] = useState(points.length - 1);
+
   if (points.length === 0) return null;
 
-  // טווח הגילים: מהלידה ועד קצת אחרי המדידה האחרונה, כדי שהנקודה
-  // האחרונה לא תידבק לקצה
   const lastAge = points[points.length - 1].ageDays;
   const maxAge = Math.min(MAX_AGE_DAYS, Math.max(60, Math.ceil(lastAge * 1.15)));
 
@@ -72,7 +87,6 @@ export function GrowthCurve({
   const y = (value: number) =>
     PAD_TOP + (1 - (value - lo + span * 0.06) / (span * 1.12)) * (H - PAD_TOP - PAD_BOTTOM);
 
-  /** רצועה בין שתי עקומות z, כמצולע סגור. */
   const bandPath = (lower: number[], upper: number[]) =>
     [
       ...ages.map((age, i) => `${i === 0 ? "M" : "L"}${x(age).toFixed(1)},${y(lower[i]).toFixed(1)}`),
@@ -92,15 +106,15 @@ export function GrowthCurve({
     .map((p, i) => `${i === 0 ? "M" : "L"}${x(p.ageDays).toFixed(1)},${y(p.value).toFixed(1)}`)
     .join(" ");
 
-  const latest = points[points.length - 1];
   const unit = INDICATOR_UNIT[indicator];
   const decimals = indicator === "weight" ? 3 : 1;
+  const active = points[selected] ?? points[points.length - 1];
 
   return (
     <figure className="mt-3 mb-0">
       <svg
         viewBox={`0 0 ${W} ${H}`}
-        className="h-auto w-full"
+        className="h-auto w-full touch-manipulation"
         role="img"
         aria-label={`${INDICATOR_LABEL[indicator]} מול תקן WHO`}
       >
@@ -112,7 +126,6 @@ export function GrowthCurve({
         <path d={bandPath(bands[0], bands[4])} fill="var(--ev-growth)" opacity="0.08" />
         <path d={bandPath(bands[1], bands[3])} fill="var(--ev-growth)" opacity="0.12" />
 
-        {/* החציון */}
         <path
           d={linePath(bands[2])}
           fill="none"
@@ -122,7 +135,6 @@ export function GrowthCurve({
           opacity="0.5"
         />
 
-        {/* תוויות הרצועות על הקצה השמאלי, שם הקווים הכי מרוחקים זה מזה */}
         {[
           { i: 4, label: "97" },
           { i: 2, label: "50" },
@@ -140,7 +152,6 @@ export function GrowthCurve({
           </text>
         ))}
 
-        {/* המדידות שלה */}
         {points.length > 1 ? (
           <path
             d={measured}
@@ -152,26 +163,48 @@ export function GrowthCurve({
           />
         ) : null}
 
-        {points.map((p) => (
-          <circle
+        {/* קו אנכי שמחבר את הנקודה הפתוחה לפרטים שמתחת לגרף */}
+        <line
+          x1={x(active.ageDays)}
+          x2={x(active.ageDays)}
+          y1={y(active.value)}
+          y2={H - PAD_BOTTOM + 4}
+          stroke="var(--ev-growth)"
+          strokeWidth="1"
+          strokeDasharray="2 2"
+          opacity="0.45"
+        />
+
+        {points.map((p, i) => (
+          <g
             key={p.at}
-            cx={x(p.ageDays)}
-            cy={y(p.value)}
-            r="4"
-            fill="var(--ev-growth)"
-            // טבעת בצבע הרקע: מפרידה את הנקודה מהרצועה שמתחתיה
-            stroke="var(--surface-card)"
-            strokeWidth="2"
+            role="button"
+            tabIndex={0}
+            aria-label={describe(p, unit, decimals)}
+            aria-pressed={i === selected}
+            onClick={() => setSelected(i)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                setSelected(i);
+              }
+            }}
+            className="cursor-pointer focus:outline-none"
           >
-            {/* מחרוזת אחת, ותאריך שאינו תלוי באזור הזמן של המכשיר —
-                אחרת ההידרציה נשברת והעמוד נבנה מחדש בדפדפן */}
-            <title>
-              {`${shortDate(p.at.slice(0, 10))} · ${p.value.toFixed(decimals)} ${unit} · אחוזון ${Math.round(p.percentile)}`}
-            </title>
-          </circle>
+            {/* מעגל שקוף ורחב: זה מה שהאצבע פוגעת בו */}
+            <circle cx={x(p.ageDays)} cy={y(p.value)} r={HIT_R} fill="transparent" />
+            <circle
+              cx={x(p.ageDays)}
+              cy={y(p.value)}
+              r={i === selected ? 5.5 : 4}
+              fill="var(--ev-growth)"
+              stroke="var(--surface-card)"
+              strokeWidth={i === selected ? 2.5 : 2}
+            />
+            <title>{describe(p, unit, decimals)}</title>
+          </g>
         ))}
 
-        {/* ציר הגיל: רק שני הקצוות, כי זה כל מה שצריך כדי לקרוא אותו */}
         <text x={W - PAD_X} y={H - 7} textAnchor="end" fontSize="9" fill="var(--text-faint)">
           לידה
         </text>
@@ -180,16 +213,41 @@ export function GrowthCurve({
         </text>
       </svg>
 
-      <figcaption className="mt-1 text-[0.75rem] leading-relaxed text-faint">
-        הרצועות הן אחוזוני WHO ל{sex === "female" ? "בנות" : "בנים"} — הבהירה 3 עד
-        97, הכהה 15 עד 85, והקו המקווקו הוא החציון. המדידה האחרונה:{" "}
-        <span className="tnum">
-          {latest.value.toFixed(decimals)} {unit}
+      {/* גובה קבוע: מעבר בין נקודות לא אמור להקפיץ את מה שמתחת */}
+      <figcaption
+        aria-live="polite"
+        className="mt-2 min-h-[4.5rem] rounded-md bg-surface-sunken px-3 py-2.5"
+      >
+        <span className="tnum block text-[0.9375rem] font-semibold text-strong">
+          {active.value.toFixed(decimals)} {unit} · אחוזון{" "}
+          {Math.round(active.percentile)}
         </span>
-        .
+        <span className="tnum block text-[0.8125rem] text-muted">
+          {fullDate(active.at)}
+        </span>
+        <span className="block text-[0.75rem] text-faint">
+          {compactAge(active.ageDays)}
+          {active.ageDays > 0 ? ` · ${active.ageDays} ימים` : ""}
+          {points.length > 1 ? " · לחיצה על נקודה בגרף מציגה שקילה אחרת" : ""}
+        </span>
       </figcaption>
+
+      <p className="mt-2 text-[0.75rem] leading-relaxed text-faint">
+        הרצועות הן אחוזוני WHO ל{sex === "female" ? "בנות" : "בנים"} — הבהירה 3 עד
+        97, הכהה 15 עד 85, והקו המקווקו הוא החציון.
+      </p>
     </figure>
   );
+}
+
+/** "יום שלישי, 3 בנובמבר 2026" — עם השנה, כי מדידות נפרשות על שנתיים. */
+function fullDate(at: string): string {
+  const key = at.slice(0, 10);
+  return `${longDate(key)} ${key.slice(0, 4)}`;
+}
+
+function describe(p: GrowthPoint, unit: string, decimals: number): string {
+  return `${fullDate(p.at)} · ${p.value.toFixed(decimals)} ${unit} · אחוזון ${Math.round(p.percentile)}`;
 }
 
 function monthsLabel(days: number): string {
