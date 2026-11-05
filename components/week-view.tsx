@@ -19,6 +19,8 @@ export function WeekView({
   todayKey,
   growth,
   birthWeightG,
+  birthDate,
+  sex,
 }: {
   days: DaySummary[];
   heatmap: number[][];
@@ -26,6 +28,9 @@ export function WeekView({
   /** מדידות גדילה לכל הזמנים */
   growth: EventRow[];
   birthWeightG: number | null;
+  /** נדרשים לאחוזוני הגדילה; בלעדיהם מוצג רק גרף המדידות */
+  birthDate?: string;
+  sex?: "male" | "female" | "unspecified" | null;
 }) {
   const labels = days.map((d) => weekdayShort(d.key));
 
@@ -139,7 +144,12 @@ export function WeekView({
           </>
         )}
 
-        <GrowthPanel events={growth} birthWeightG={birthWeightG} />
+        <GrowthPanel
+          events={growth}
+          birthWeightG={birthWeightG}
+          birthDate={birthDate}
+          sex={sex}
+        />
 
         <Link
           href="/doctor"

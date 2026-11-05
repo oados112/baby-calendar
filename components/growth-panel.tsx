@@ -1,18 +1,27 @@
 import { StatTile } from "@/components/charts";
+import { shortDate } from "@/lib/zoned";
+import { GrowthCurve } from "@/components/growth-curve";
+import {
+  growthSeries,
+  percentileHebrew,
+  type GrowthIndicator,
+  type GrowthSex,
+} from "@/lib/growth";
 import type { EventRow } from "@/types/db";
 
 /**
  * מעקב גדילה.
  *
- * מה שמוצג כאן הוא **המדידות שלכם בלבד** — אין כאן עקומות אחוזונים.
- * זו החלטה מכוונת ולא חוסר: טבלאות האחוזונים של WHO תלויות במין ובגיל
- * מדויק, ופרסום מספרים לא מאומתים לצד משקל של תינוק אמיתי מזיק יותר
- * ממה שהוא מועיל. עקומות ייתווספו כשיהיו לנו נתוני ייחוס מאומתים.
- *
- * מה כן מוצג, וזה מה שבאמת עוקבים אחריו בשבועות הראשונים:
- *  • המשקל לאורך זמן
+ * מוצג כאן:
+ *  • המשקל לאורך זמן, מול עקומות הייחוס של WHO
+ *  • **האחוזון** של כל מדד, כשידועים המין ותאריך הלידה
  *  • **קצב העלייה בגרמים ליום** בין שתי מדידות
  *  • מתי חזר למשקל הלידה — אבן הדרך של השבועיים הראשונים
+ *
+ * האחוזונים נשענים על טבלאות ה-LMS הרשמיות של WHO (ראו
+ * `lib/growth-standards.ts`). הם מוצגים כתיאור ולא כשיפוט: אחוזון
+ * 15 יציב אינו פחות טוב מאחוזון 85 יציב, ומה שמעניין הוא השמירה על
+ * העקומה. בלי מין או בלי תאריך לידה פשוט לא מוצג אחוזון.
  */
 
 interface Measurement {
@@ -45,10 +54,25 @@ function daysBetween(a: string, b: string): number {
 export function GrowthPanel({
   events,
   birthWeightG,
+  birthDate,
+  sex,
 }: {
   events: EventRow[];
   birthWeightG: number | null;
+  birthDate?: string;
+  /** אין תקן ל"לא צוין" — אז פשוט אין אחוזון */
+  sex?: "male" | "female" | "unspecified" | null;
 }) {
+  const standardSex: GrowthSex | null =
+    sex === "male" || sex === "female" ? sex : null;
+
+  /** האחוזון האחרון של מדד, או null כשאי אפשר לחשב. */
+  const latestPercentile = (indicator: GrowthIndicator): string | undefined => {
+    if (!birthDate || !standardSex) return undefined;
+    const series = growthSeries(events, birthDate, standardSex, indicator);
+    const last = series[series.length - 1];
+    return last ? percentileHebrew(last.percentile) : undefined;
+  };
   const measurements = toMeasurements(events);
   const weights = measurements.filter(
     (m): m is Measurement & { weightG: number } => m.weightG !== null,
@@ -96,9 +120,10 @@ export function GrowthPanel({
           value={(latest.weightG / 1000).toFixed(3)}
           unit="ק״ג"
           hint={
-            sinceBirth !== null
+            latestPercentile("weight") ??
+            (sinceBirth !== null
               ? `${sinceBirth >= 0 ? "+" : "−"}${Math.abs(sinceBirth)} גרם מהלידה`
-              : undefined
+              : undefined)
           }
         />
         <StatTile
@@ -114,6 +139,7 @@ export function GrowthPanel({
             tone="growth"
             value={String(latestHeight.heightCm)}
             unit="ס״מ"
+            hint={latestPercentile("length")}
           />
         ) : null}
         {latestHead ? (
@@ -122,6 +148,7 @@ export function GrowthPanel({
             tone="growth"
             value={String(latestHead.headCm)}
             unit="ס״מ"
+            hint={latestPercentile("head")}
           />
         ) : null}
       </div>
@@ -133,10 +160,27 @@ export function GrowthPanel({
         </p>
       ) : null}
 
-      <WeightChart points={weights} birthWeightG={birthWeightG} />
+      {birthDate && standardSex ? (
+        <GrowthCurve
+          events={events}
+          birthDate={birthDate}
+          sex={standardSex}
+          indicator="weight"
+        />
+      ) : (
+        <>
+          <WeightChart points={weights} birthWeightG={birthWeightG} />
+          <p className="mt-3 text-[0.75rem] leading-relaxed text-faint">
+            {standardSex
+              ? "צריך תאריך לידה כדי להציג אחוזונים."
+              : "כדי להציג אחוזונים צריך לבחור מין בהגדרות — התקן של WHO נפרד לבנים ולבנות."}
+          </p>
+        </>
+      )}
 
       <p className="mt-3 text-[0.75rem] leading-relaxed text-faint">
-        אלה המדידות שלכם בלבד, בלי עקומות אחוזונים. השוואה לאחוזונים נעשית
+        האחוזונים מחושבים לפי תקני הגדילה של ארגון הבריאות העולמי. הם מתארים
+        מיקום ולא ציון — מה שעוקבים אחריו הוא שמירה על העקומה. הפירוש נעשה
         בטיפת חלב.
       </p>
     </section>
@@ -229,10 +273,9 @@ function WeightChart({
           stroke="var(--surface-card)"
           strokeWidth="2"
         >
-          <title>
-            {new Date(p.at).toLocaleDateString("he-IL")} · {(p.weightG / 1000).toFixed(3)}{" "}
-            ק״ג
-          </title>
+          {/* shortDate ולא toLocaleDateString: השרת רץ ב-UTC והדפדפן
+              בזמן מקומי, ושתי התוצאות לא תמיד זהות */}
+          <title>{`${shortDate(p.at.slice(0, 10))} · ${(p.weightG / 1000).toFixed(3)} ק״ג`}</title>
         </circle>
       ))}
 

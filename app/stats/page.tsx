@@ -27,6 +27,8 @@ export default async function StatsPage() {
         todayKey={today}
         growth={[]}
         birthWeightG={2795}
+        birthDate="2026-09-12"
+        sex="female"
       />
     );
   }
@@ -59,6 +61,8 @@ export default async function StatsPage() {
       todayKey={todayKey}
       growth={growth}
       birthWeightG={baby.birth_weight_g}
+      birthDate={baby.birth_date}
+      sex={baby.sex}
     />
   );
 }

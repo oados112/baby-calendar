@@ -181,9 +181,12 @@ export function SleepHeatmap({
                 fill={intensity > 0 ? "var(--ev-sleep)" : "var(--surface-sunken)"}
                 opacity={intensity > 0 ? 0.25 + intensity * 0.75 : 1}
               >
+                {/* מחרוזת אחת ולא כמה ילדים: טקסט מורכב בתוך title
+                    נשבר בהידרציה, והדף כולו נזרק ונבנה מחדש בדפדפן */}
                 <title>
-                  {rowLabels[r]} · {String(h).padStart(2, "0")}:00 ·{" "}
-                  {minutes > 0 ? `${Math.round(minutes)} דק׳ שינה` : "ער/ה"}
+                  {`${rowLabels[r]} · ${String(h).padStart(2, "0")}:00 · ${
+                    minutes > 0 ? `${Math.round(minutes)} דק׳ שינה` : "ער/ה"
+                  }`}
                 </title>
               </rect>
             );
