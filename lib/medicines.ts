@@ -69,9 +69,29 @@ export const MEDICINES: MedicineDef[] = [
   {
     id: "probiotic",
     label: "פרוביוטיקה",
+    ingredient: "פרוביוטיקה",
     units: ["טיפות", "מ״ל", "שקית"],
     minHours: 20,
     maxPerDay: 1,
+  },
+  {
+    id: "biogaia",
+    label: "ביוגאיה",
+    ingredient: "פרוביוטיקה",
+    units: ["טיפות", "מ״ל"],
+    minHours: 20,
+    maxPerDay: 1,
+    note: "פרוביוטיקה — נספרת יחד עם פרוביוטיקה אחרת",
+  },
+  {
+    id: "likchik",
+    label: "ליקצ׳יק",
+    units: ["טיפות"],
+    // תוסף תזונה לגזים, שניתן לפי הצורך. היצרן אינו מפרסם מרווח
+    // מינימלי או מספר מנות מרבי ליממה, ולכן אין כאן בדיקת מרווח —
+    // להמציא כזו היה מייצר אזהרה שאין מאחוריה כלום
+    minHours: 0,
+    note: "תוסף תזונה לגזים, לפי הצורך. המינון על האריזה",
   },
   {
     id: "other",
@@ -173,7 +193,10 @@ export function checkDose({
  * כי "ויטמין D" ו-"ויטמין d." הם אותו דבר.
  */
 export function matchMedicine(name: string): MedicineDef | null {
-  const normalize = (v: string) => v.toLowerCase().replace(/[\s.,/-]/g, "");
+  // הגרש נזרק יחד עם שאר הפיסוק: על האריזה כתוב "ליקצ׳יק", אבל
+  // כמעט אף אחד לא מקליד גרש, ו"ליקציק" חייב להתאים לאותו פריט.
+  // נזרקים שלושת הווריאנטים — גרש עברי, גרש ישר וגרש מסולסל
+  const normalize = (v: string) => v.toLowerCase().replace(/[\s.,/\-׳'’]/g, "");
   const target = normalize(name);
   if (!target) return null;
 
